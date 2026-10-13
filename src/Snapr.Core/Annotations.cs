@@ -1,0 +1,46 @@
+using System.Text.Json.Serialization;
+
+namespace Snapr.Core;
+
+public enum ArrowHead { None, Triangle, Line }
+public enum ShapeKind { Rectangle, Ellipse }
+public enum BlurMode { Blur, Pixelate }
+public enum MagnifyShape { Circle, Rectangle }
+
+[JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
+[JsonDerivedType(typeof(ArrowAnnotation), "arrow")]
+[JsonDerivedType(typeof(ShapeAnnotation), "shape")]
+[JsonDerivedType(typeof(TextAnnotation), "text")]
+[JsonDerivedType(typeof(CalloutAnnotation), "callout")]
+[JsonDerivedType(typeof(StepAnnotation), "step")]
+[JsonDerivedType(typeof(HighlightAnnotation), "highlight")]
+[JsonDerivedType(typeof(PenAnnotation), "pen")]
+[JsonDerivedType(typeof(BlurAnnotation), "blur")]
+[JsonDerivedType(typeof(MagnifyAnnotation), "magnify")]
+public abstract record Annotation
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public bool Shadow { get; init; }
+}
+
+public sealed record ArrowAnnotation(Pt Start, Pt End, string Color, double Width,
+    ArrowHead Head = ArrowHead.Triangle, ArrowHead Tail = ArrowHead.None) : Annotation;
+
+public sealed record ShapeAnnotation(ShapeKind Kind, Rct Bounds, string Stroke, double StrokeWidth,
+    string? Fill = null, double CornerRadius = 0) : Annotation;
+
+public sealed record TextAnnotation(Pt Position, string Text, string FontFamily, double FontSize, bool Bold,
+    string Color, string? Background = null) : Annotation;
+
+public sealed record CalloutAnnotation(Rct Bounds, string Text, double FontSize, string Fill, string Stroke,
+    string TextColor, Pt TailPoint) : Annotation;
+
+public sealed record StepAnnotation(Pt Center, int Number, double Size, string Fill, string TextColor) : Annotation;
+
+public sealed record HighlightAnnotation(Rct Bounds, string Color) : Annotation;
+
+public sealed record PenAnnotation(IReadOnlyList<Pt> Points, string Color, double Width) : Annotation;
+
+public sealed record BlurAnnotation(Rct Bounds, BlurMode Mode, int Strength) : Annotation;
+
+public sealed record MagnifyAnnotation(Rct SourceBounds, Pt TargetCenter, double Zoom, MagnifyShape Shape) : Annotation;

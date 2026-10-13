@@ -1,0 +1,82 @@
+<Window x:Class="Snapr.App.Editor.EditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ed="clr-namespace:Snapr.App.Editor"
+        Title="Snapr" Width="1280" Height="820" MinWidth="900" MinHeight="560"
+        Style="{StaticResource SnaprWindow}" WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Height="48" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
+      <DockPanel Margin="12,0">
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Image x:Name="LogoImage" Width="20" Height="20" Margin="0,0,8,0"/>
+          <TextBlock Text="Snapr" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center"/>
+          <TextBlock x:Name="TitleText" Margin="12,0,0,0" Foreground="{StaticResource TextSecondaryBrush}"
+                     VerticalAlignment="Center" Typography.NumeralAlignment="Tabular"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+          <Button x:Name="UndoButton" Content="Undo" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click"/>
+          <Button x:Name="RedoButton" Content="Redo" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click"/>
+          <Button Content="Grab Text" ToolTip="Copy the text in the selected object's area, or the whole image" Click="GrabText_Click"/>
+          <Button Content="Copy" ToolTip="Copy image with effects (Ctrl+C)" Click="Copy_Click"/>
+          <Button Content="Save" ToolTip="Save as PNG or JPG (Ctrl+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
+          <Button x:Name="ExportButton" Content="Export ▾" Click="Export_Click">
+            <Button.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="PNG image…" Click="ExportPng_Click"/>
+                <MenuItem Header="JPG image…" Click="ExportJpg_Click"/>
+                <MenuItem Header="Snapr file (.snapr)…" Click="ExportSnapr_Click"/>
+                <Separator/>
+                <MenuItem Header="Show in folder" Click="ShowInFolder_Click"/>
+              </ContextMenu>
+            </Button.ContextMenu>
+          </Button>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Bottom" Height="96" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,1,0,0">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl x:Name="RecentsList" Margin="8,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <Border DockPanel.Dock="Left" Width="48" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,1,0">
+      <StackPanel x:Name="ToolPanel" Margin="0,8"/>
+    </Border>
+
+    <Border DockPanel.Dock="Right" Width="240" Background="{StaticResource PanelBrush}"
+            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1,0,0,0">
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="PropsPanel" Margin="16,0,16,16"/>
+      </ScrollViewer>
+    </Border>
+
+    <Grid Background="{StaticResource CanvasBrush}">
+      <ScrollViewer x:Name="CanvasScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Focusable="False">
+        <Border x:Name="CanvasFrame" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32"
+                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1">
+          <ed:EditorCanvas x:Name="Board"/>
+        </Border>
+      </ScrollViewer>
+      <TextBlock x:Name="EmptyText" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                 Foreground="{StaticResource TextSecondaryBrush}" FontSize="14" LineHeight="22"
+                 Text="No capture yet.&#10;Press Print Screen, or use Open image… in the tray menu."/>
+      <Border x:Name="SaveBanner" Visibility="Collapsed" VerticalAlignment="Top" HorizontalAlignment="Center"
+              Margin="0,12" Background="#7F1D1D" CornerRadius="6" Padding="12,6">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock x:Name="SaveBannerText" Text="Not saved" Foreground="White" VerticalAlignment="Center" MaxWidth="520" TextTrimming="CharacterEllipsis"/>
+          <Button Content="Retry" Margin="12,0,0,0" Click="RetrySave_Click"/>
+        </StackPanel>
+      </Border>
+      <Button x:Name="ZoomButton" Content="Fit" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12"
+              ToolTip="Switch between fit-to-window and actual pixels" Click="Zoom_Click"/>
+    </Grid>
+  </DockPanel>
+</Window>
