@@ -8,6 +8,13 @@ public static class DocumentOps
     public static DocumentState Replace(this DocumentState s, Annotation a) =>
         s with { Annotations = s.Annotations.Select(x => x.Id == a.Id ? a : x).ToArray() };
 
+    /// <summary>Adds a copy of <paramref name="source"/> with a new ID, moved down-right by <paramref name="offset"/>.</summary>
+    public static (DocumentState State, Annotation Pasted) PasteCopy(this DocumentState s, Annotation source, double offset)
+    {
+        var pasted = AnnotationGeometry.Translate(source, offset, offset) with { Id = Guid.NewGuid() };
+        return (s.Add(pasted), pasted);
+    }
+
     public static DocumentState Remove(this DocumentState s, Guid id) =>
         s with { Annotations = s.Annotations.Where(x => x.Id != id).ToArray() };
 
@@ -21,9 +28,15 @@ public static class DocumentOps
             ? s with { Annotations = [a, .. s.Annotations.Where(x => x.Id != id)] }
             : s;
 
-    public static DocumentState AddStep(this DocumentState s, Pt center, ToolStyle style) =>
-        s.Add(new StepAnnotation(center, s.NextStepNumber, AnnotationGeometry.StepSize(style.FontSize), style.Color, "#FFFFFFFF")
+    public static DocumentState AddStep(this DocumentState s, Pt center, ToolStyle style, StepStyle steps = StepStyle.Numbers) =>
+        s.Add(new StepAnnotation(center, s.NextStepNumber, AnnotationGeometry.StepSize(style.FontSize), style.Color, "#FFFFFFFF", steps)
             { Shadow = style.Shadow }) with { NextStepNumber = s.NextStepNumber + 1 };
+
+    /// <summary>Sets one step's value (clamped to 1–9999). Other steps and the next number are unchanged.</summary>
+    public static DocumentState SetStepNumber(this DocumentState s, Guid id, int value) =>
+        s.Annotations.FirstOrDefault(a => a.Id == id) is StepAnnotation step
+            ? s.Replace(step with { Number = Math.Clamp(value, 1, 9999) })
+            : s;
 
     public static DocumentState RestartSteps(this DocumentState s) => s with { NextStepNumber = 1 };
 

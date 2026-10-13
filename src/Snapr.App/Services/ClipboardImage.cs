@@ -20,7 +20,7 @@ public static class ClipboardImage
     public static bool SetText(string text) => Try(() => Clipboard.SetText(text));
 
     /// <summary>Another app may hold the clipboard open for a moment; retry briefly instead of failing.</summary>
-    static bool Try(Action set)
+    internal static bool Try(Action set)
     {
         for (var i = 0; i < 5; i++)
         {

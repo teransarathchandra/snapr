@@ -237,7 +237,7 @@ public sealed class EditorCanvas : Canvas
                 if (_pen is { Count: > 1 }) Commit(_state.Add(AnnotationFactory.Pen(_pen.ToArray(), CurrentStyle)));
                 break;
             case ToolKind.Step:
-                Commit(_state.AddStep(p, CurrentStyle));
+                Commit(_state.AddStep(p, CurrentStyle, Options.Steps));
                 break;
             case ToolKind.Eraser:
                 if (_state.HitTest(p, 6 / Zoom) is { } hit) Commit(_state.Remove(hit.Id));

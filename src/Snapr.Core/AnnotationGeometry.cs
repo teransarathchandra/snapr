@@ -95,6 +95,21 @@ public static class AnnotationGeometry
         _ => a,
     };
 
+    /// <summary>Mirrors an object within its own bounds. Shapes, text, steps, highlight, blur and magnify are left as they are.</summary>
+    public static Annotation Flip(Annotation a, bool horizontal)
+    {
+        var c = Bounds(a).Center;
+        Pt M(Pt p) => horizontal ? new(2 * c.X - p.X, p.Y) : new(p.X, 2 * c.Y - p.Y);
+        Rct MR(Rct r) => horizontal ? r with { X = 2 * c.X - r.Right } : r with { Y = 2 * c.Y - r.Bottom };
+        return a switch
+        {
+            ArrowAnnotation x => x with { Start = M(x.Start), End = M(x.End) },
+            PenAnnotation x => x with { Points = x.Points.Select(M).ToArray() },
+            CalloutAnnotation x => x with { Bounds = MR(x.Bounds), TailPoint = M(x.TailPoint) },
+            _ => a,
+        };
+    }
+
     public static Annotation WithStyle(Annotation a, ToolStyle s) => (a switch
     {
         ArrowAnnotation x => x with { Color = s.Color, Width = s.Width },
@@ -125,6 +140,7 @@ public static class AnnotationGeometry
     {
         BlurAnnotation x => x with { Mode = o.Blur, Strength = Math.Clamp(o.BlurStrength, 1, 20) },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(o.Zoom, 1.5, 4), Shape = o.Lens },
+        StepAnnotation x => x with { Style = o.Steps },
         _ => a,
     };
 
@@ -132,6 +148,7 @@ public static class AnnotationGeometry
     {
         BlurAnnotation x => fallback with { Blur = x.Mode, BlurStrength = x.Strength },
         MagnifyAnnotation x => fallback with { Zoom = x.Zoom, Lens = x.Shape },
+        StepAnnotation x => fallback with { Steps = x.Style },
         _ => fallback,
     };
 }

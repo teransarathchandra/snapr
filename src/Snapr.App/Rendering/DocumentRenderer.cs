@@ -184,7 +184,8 @@ public static class DocumentRenderer
     static void DrawStep(DrawingContext dc, StepAnnotation x)
     {
         dc.DrawEllipse(ImageIo.Brush(x.Fill), null, P(x.Center), x.Size / 2, x.Size / 2);
-        var ft = Text(x.Number.ToString(CultureInfo.InvariantCulture), "Segoe UI", x.Size * 0.55, true, x.TextColor, double.NaN);
+        var label = StepLabels.Format(x.Number, x.Style);
+        var ft = Text(label, "Segoe UI", x.Size * (label.Length > 2 ? 0.4 : 0.55), true, x.TextColor, double.NaN);
         dc.DrawText(ft, new Point(x.Center.X - ft.Width / 2, x.Center.Y - ft.Height / 2));
     }
 

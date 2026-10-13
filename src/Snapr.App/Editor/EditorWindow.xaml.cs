@@ -33,7 +33,8 @@ public partial class EditorWindow : Window
     BitmapSource? _base;
     string? _path;
     bool _dirty;
-    bool _fit = true;
+    double? _manualZoom;   // null = fit to window; otherwise relative to 100%
+    int _pasteCount;
     bool _allowClose;
     string? _lastMergeKey;
     DateTime _lastMergeAt;
@@ -69,7 +70,8 @@ public partial class EditorWindow : Window
         _dirty = saveNow;
         Board.Load(_base, doc.State);
         TitleText.Text = $"{Path.GetFileNameWithoutExtension(path)}  ·  {doc.PixelWidth} × {doc.PixelHeight}";
-        _fit = true;
+        _manualZoom = null;
+        _pasteCount = 0;
         UpdateEmptyState();
         UpdateUndoButtons();
         if (saveNow) SaveNow();
@@ -186,12 +188,71 @@ public partial class EditorWindow : Window
 
     BitmapSource RenderForExport() => DocumentRenderer.Render(_base!, _undo!.Current, applyEffects: true);
 
-    void Copy()
+    /// <summary>Returns true only if the clipboard write succeeded.</summary>
+    bool Copy(bool wholeImage = false)
+    {
+        if (_doc is null) return false;
+        Board.CommitTextEditor();
+        bool ok;
+        if (!wholeImage && Board.Selected is { } s)
+            ok = AnnotationClipboard.Set(s, RenderArea(AnnotationGeometry.Bounds(s)));
+        else if ((ok = ClipboardImage.Set(RenderForExport())))
+            _app.Notify("Copied", "The image is on the clipboard.");
+        if (ok) _pasteCount = 0;
+        else MessageBox.Show(this, "Another app is holding the clipboard. Try again.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return ok;
+    }
+
+    void Cut()
+    {
+        if (Board.Selected is null) return;
+        if (Copy()) Board.DeleteSelected();
+    }
+
+    void Paste()
+    {
+        if (_doc is not null && AnnotationClipboard.Get() is { } source)
+        {
+            Board.CommitTextEditor();
+            var (next, pasted) = Board.State.PasteCopy(source, 16 * ++_pasteCount);
+            Board.Apply(_ => next);
+            SetTool(ToolKind.Move);
+            Board.Select(next.Annotations.First(a => a.Id == pasted.Id));
+            return;
+        }
+        _app.OpenFromClipboard();
+    }
+
+    /// <summary>The document (no effects) rendered and cut to an area, for copying one object to other apps.</summary>
+    BitmapSource RenderArea(Rct area)
+    {
+        var full = DocumentRenderer.Render(_base!, _undo!.Current with { Crop = null }, applyEffects: false);
+        var crop = new CroppedBitmap(full, PixelRect(area));
+        crop.Freeze();
+        return crop;
+    }
+
+    /// <summary>Whole-pixel part of an area inside the base image; the whole image if the area is empty or outside.</summary>
+    Int32Rect PixelRect(Rct area)
+    {
+        var a = area.Intersect(new Rct(0, 0, _base!.PixelWidth, _base.PixelHeight));
+        if (a.IsEmpty) return new Int32Rect(0, 0, _base.PixelWidth, _base.PixelHeight);
+        int x = (int)Math.Floor(a.X), y = (int)Math.Floor(a.Y);
+        return new Int32Rect(x, y, Math.Max(1, Math.Min(_base.PixelWidth - x, (int)Math.Ceiling(a.Right) - x)),
+            Math.Max(1, Math.Min(_base.PixelHeight - y, (int)Math.Ceiling(a.Bottom) - y)));
+    }
+
+    void Print()
     {
         if (_doc is null) return;
         Board.CommitTextEditor();
-        if (ClipboardImage.Set(RenderForExport())) _app.Notify("Copied", "The image is on the clipboard.");
-        else MessageBox.Show(this, "Another app is holding the clipboard. Try again.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        var dialog = new PrintDialog();
+        if (dialog.ShowDialog() != true) return;
+        var image = RenderForExport();
+        var scale = Math.Min(1, Math.Min(dialog.PrintableAreaWidth / image.Width, dialog.PrintableAreaHeight / image.Height));
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen()) dc.DrawImage(image, new Rect(0, 0, image.Width * scale, image.Height * scale));
+        dialog.PrintVisual(visual, Path.GetFileNameWithoutExtension(_path) ?? "Snapr");
     }
 
     void ExportImage(string format)
@@ -257,7 +318,7 @@ public partial class EditorWindow : Window
 
     void Undo_Click(object sender, RoutedEventArgs e) => Undo();
     void Redo_Click(object sender, RoutedEventArgs e) => Redo();
-    void Copy_Click(object sender, RoutedEventArgs e) => Copy();
+    void Copy_Click(object sender, RoutedEventArgs e) => Copy(wholeImage: true);
     void Save_Click(object sender, RoutedEventArgs e) => ExportImage(_app.Settings.ExportFormat);
     void ExportPng_Click(object sender, RoutedEventArgs e) => ExportImage("png");
     void ExportJpg_Click(object sender, RoutedEventArgs e) => ExportImage("jpg");
@@ -277,34 +338,39 @@ public partial class EditorWindow : Window
     void GrabText_Click(object sender, RoutedEventArgs e)
     {
         if (_base is null) return;
-        var area = Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View;
-        if (area.IsEmpty) area = Board.View;
-        int x = (int)Math.Max(0, Math.Floor(area.X)), y = (int)Math.Max(0, Math.Floor(area.Y));
-        int w = Math.Max(1, Math.Min(_base.PixelWidth - x, (int)Math.Ceiling(area.W))), h = Math.Max(1, Math.Min(_base.PixelHeight - y, (int)Math.Ceiling(area.H)));
-        var crop = new CroppedBitmap(_base, new Int32Rect(x, y, w, h));
+        var crop = new CroppedBitmap(_base, PixelRect(Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View));
         crop.Freeze();
         _app.Fire(() => _app.GrabTextAsync(crop));
     }
 
     // ---------- Zoom ----------
 
+    double PixelScale => 1 / VisualTreeHelper.GetDpi(this).DpiScaleX;   // 1 image pixel = 1 screen pixel
+
     void ApplyZoom()
     {
         if (_base is null || !IsLoaded) return;
         var view = Board.View;
-        var pixel = 1 / VisualTreeHelper.GetDpi(this).DpiScaleX;   // 1 image pixel = 1 screen pixel
+        var pixel = PixelScale;
         // Leave room for a scrollbar so "fit" never overflows by a rounding pixel and triggers scrollbars.
         var fit = Math.Min((CanvasScroller.ActualWidth - 66 - SystemParameters.VerticalScrollBarWidth) / view.W,
             (CanvasScroller.ActualHeight - 66 - SystemParameters.HorizontalScrollBarHeight) / view.H);
-        var zoom = _fit ? Math.Max(0.05, Math.Min(pixel, fit)) : pixel;
+        var zoom = _manualZoom is { } m ? m * pixel : Math.Max(0.05, Math.Min(pixel, fit));
         Board.Zoom = zoom;   // screen units per image pixel; the canvas divides handle sizes by it
         Board.LayoutTransform = new ScaleTransform(zoom, zoom);
-        ZoomButton.Content = _fit ? $"Fit · {zoom / pixel:P0}" : "100%";
+        ZoomButton.Content = _manualZoom is null ? $"Fit · {zoom / pixel:P0}" : $"{zoom / pixel:P0}";
     }
 
     void Zoom_Click(object sender, RoutedEventArgs e)
     {
-        _fit = !_fit;
+        _manualZoom = _manualZoom is null ? 1 : null;
+        ApplyZoom();
+    }
+
+    void ZoomBy(int direction)
+    {
+        if (_base is null) return;
+        _manualZoom = ZoomSteps.Next(Board.Zoom / PixelScale, direction);
         ApplyZoom();
     }
 
@@ -369,15 +435,38 @@ public partial class EditorWindow : Window
     void OnKey(object sender, KeyEventArgs e)
     {
         if (Keyboard.FocusedElement is TextBox) return;
-        var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
-        if (ctrl && e.Key == Key.Z) Undo();
-        else if (ctrl && e.Key == Key.Y) Redo();
-        else if (ctrl && e.Key == Key.C) Copy();
-        else if (ctrl && e.Key == Key.S) ExportImage(_app.Settings.ExportFormat);
-        else if (e.Key == Key.Delete) Board.DeleteSelected();
-        else if (Keyboard.Modifiers == ModifierKeys.None && Array.FindIndex(Tools, t => t.Key == e.Key) is var i and >= 0) SetTool(Tools[i].Tool);
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (EditorShortcuts.Resolve(Keyboard.Modifiers, key) is { } command) Run(command);
+        else if (Keyboard.Modifiers == ModifierKeys.None && Array.FindIndex(Tools, t => t.Key == key) is var i and >= 0) SetTool(Tools[i].Tool);
         else return;
         e.Handled = true;
+    }
+
+    void Run(EditorCommand command)
+    {
+        switch (command)
+        {
+            case EditorCommand.Undo: Undo(); break;
+            case EditorCommand.Redo: Redo(); break;
+            case EditorCommand.Copy: Copy(); break;
+            case EditorCommand.Cut: Cut(); break;
+            case EditorCommand.Paste: Paste(); break;
+            case EditorCommand.Delete: Board.DeleteSelected(); break;
+            case EditorCommand.Deselect: Board.CommitTextEditor(); Board.Select(null); break;
+            case EditorCommand.SaveNow:
+                Board.CommitTextEditor();
+                _autosave.Stop();
+                if (_doc is not null && SaveNow()) _app.Notify("Saved", Path.GetFileName(_path) ?? "Saved");
+                break;
+            case EditorCommand.SaveAsImage: ExportImage(_app.Settings.ExportFormat); break;
+            case EditorCommand.Open: _app.OpenImageFromDialog(); break;
+            case EditorCommand.NewFromClipboard: _app.OpenFromClipboard(); break;
+            case EditorCommand.Close: Close(); break;
+            case EditorCommand.Print: Print(); break;
+            case EditorCommand.ZoomIn: ZoomBy(+1); break;
+            case EditorCommand.ZoomOut: ZoomBy(-1); break;
+            case EditorCommand.ZoomFit: _manualZoom = null; ApplyZoom(); break;
+        }
     }
 
     protected override void OnClosing(CancelEventArgs e)

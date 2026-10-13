@@ -73,11 +73,14 @@ public sealed partial class AppController : IDisposable
         var failed = new List<string>();
         void Register(string gesture, Func<Task> action)
         {
+            if (string.IsNullOrWhiteSpace(gesture)) return;   // empty = disabled
             if (!_hotkeys.TryRegister(gesture, () => Fire(action))) failed.Add(gesture);
         }
         Register(_settings.Hotkeys.ImageCapture, () => CaptureImageAsync());
         Register(_settings.Hotkeys.VideoCapture, ToggleRecordingAsync);
         Register(_settings.Hotkeys.ScrollingCapture, ScrollingCaptureAsync);
+        Register(_settings.Hotkeys.RepeatLastCapture, RepeatLastCaptureAsync);
+        Register(_settings.Hotkeys.VideoPauseResume, PauseResumeRecordingAsync);
         if (failed.Count > 0)
             Notify("Hotkey unavailable", $"{string.Join(", ", failed)} is already used by another app. Change it in Settings. The tray menu still works.");
     }

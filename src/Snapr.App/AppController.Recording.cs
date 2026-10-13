@@ -67,6 +67,13 @@ public sealed partial class AppController
         _tray.SetRecording(true, _recorder.IsPaused);
     }
 
+    /// <summary>Start/pause/resume hotkey: starts a recording when none is running, otherwise pauses or resumes it.</summary>
+    public async Task PauseResumeRecordingAsync()
+    {
+        if (_recorder is null) await ToggleRecordingAsync();
+        else TogglePause();
+    }
+
     /// <param name="failure">ffmpeg's last output if it stopped on its own; null for a normal stop.</param>
     async Task StopRecordingAsync(string? failure)
     {

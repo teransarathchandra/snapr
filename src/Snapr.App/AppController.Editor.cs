@@ -46,6 +46,19 @@ public sealed partial class AppController
         }
     }
 
+    /// <summary>Opens the clipboard image as a new capture (Ctrl+Shift+N, or Ctrl+V when no Snapr object is on the clipboard).</summary>
+    public void OpenFromClipboard()
+    {
+        BitmapSource? image = null;
+        Services.ClipboardImage.Try(() => image = Clipboard.ContainsImage() ? Clipboard.GetImage() : null);
+        if (image is null)
+        {
+            Notify("Nothing to paste", "The clipboard has no image or Snapr object.");
+            return;
+        }
+        OpenNewCapture(image, CaptureKind.Clipboard, "Clipboard");
+    }
+
     /// <summary>Wraps a captured bitmap in a new document, autosaves it and opens it in the editor.</summary>
     internal void OpenNewCapture(BitmapSource image, CaptureKind kind, string? title)
     {

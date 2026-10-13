@@ -18,6 +18,16 @@ public sealed class SettingsTests : IDisposable
         Assert.True(s.RecordSystemAudio);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("""{"hotkeys":"x"}""")]
+    [InlineData("""{"hotkeys":5}""")]
+    public void Wrong_json_shape_gives_defaults(string json)
+    {
+        File.WriteAllText(PathOf("shape.json"), json);
+        Assert.Equal(new AppSettings().Hotkeys, SettingsStore.Load(PathOf("shape.json")).Hotkeys);
+    }
+
     [Fact]
     public void Corrupt_file_gives_defaults()
     {
@@ -42,5 +52,29 @@ public sealed class SettingsTests : IDisposable
         var s = SettingsStore.Load(PathOf("x.json"));
         Assert.Equal((10, 1, "png"), (s.CaptureDelaySeconds, s.JpgQuality, s.ExportFormat));
         Assert.Equal("PrintScreen", s.Hotkeys.ImageCapture);
+    }
+
+    [Fact]
+    public void V1_settings_get_new_hotkey_defaults()
+    {
+        File.WriteAllText(PathOf("v1.json"), """{"hotkeys":{"imageCapture":"F9","videoCapture":"Shift+F9","scrollingCapture":"Ctrl+F9"}}""");
+        var h = SettingsStore.Load(PathOf("v1.json")).Hotkeys;
+        Assert.Equal(("F9", "Ctrl+Alt+PrintScreen", "Ctrl+Shift+PrintScreen"), (h.ImageCapture, h.RepeatLastCapture, h.VideoPauseResume));
+    }
+
+    [Fact]
+    public void Null_hotkeys_get_defaults_and_empty_means_disabled()
+    {
+        File.WriteAllText(PathOf("n.json"), """{"hotkeys":{"imageCapture":null,"repeatLastCapture":"","videoPauseResume":null}}""");
+        var h = SettingsStore.Load(PathOf("n.json")).Hotkeys;
+        Assert.Equal(("PrintScreen", "", "Ctrl+Shift+PrintScreen"), (h.ImageCapture, h.RepeatLastCapture, h.VideoPauseResume));
+    }
+
+    [Fact]
+    public void Defaulted_hotkey_that_collides_is_disabled()
+    {
+        File.WriteAllText(PathOf("c.json"), """{"hotkeys":{"imageCapture":"Ctrl+Shift+PrintScreen"}}""");
+        var h = SettingsStore.Load(PathOf("c.json")).Hotkeys;
+        Assert.Equal(("Ctrl+Alt+PrintScreen", ""), (h.RepeatLastCapture, h.VideoPauseResume));
     }
 }

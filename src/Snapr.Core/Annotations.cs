@@ -35,7 +35,10 @@ public sealed record TextAnnotation(Pt Position, string Text, string FontFamily,
 public sealed record CalloutAnnotation(Rct Bounds, string Text, double FontSize, string Fill, string Stroke,
     string TextColor, Pt TailPoint) : Annotation;
 
-public sealed record StepAnnotation(Pt Center, int Number, double Size, string Fill, string TextColor) : Annotation;
+public enum StepStyle { Numbers, Letters }
+
+public sealed record StepAnnotation(Pt Center, int Number, double Size, string Fill, string TextColor,
+    StepStyle Style = StepStyle.Numbers) : Annotation;
 
 public sealed record HighlightAnnotation(Rct Bounds, string Color) : Annotation;
 

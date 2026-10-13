@@ -18,8 +18,8 @@
           <Button x:Name="UndoButton" Content="Undo" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click"/>
           <Button x:Name="RedoButton" Content="Redo" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click"/>
           <Button Content="Grab Text" ToolTip="Copy the text in the selected object's area, or the whole image" Click="GrabText_Click"/>
-          <Button Content="Copy" ToolTip="Copy image with effects (Ctrl+C)" Click="Copy_Click"/>
-          <Button Content="Save" ToolTip="Save as PNG or JPG (Ctrl+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
+          <Button Content="Copy" ToolTip="Copy image (Ctrl+C copies the selected object)" Click="Copy_Click"/>
+          <Button Content="Save" ToolTip="Save as image (Ctrl+Shift+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
           <Button x:Name="ExportButton" Content="Export ▾" Click="Export_Click">
             <Button.ContextMenu>
               <ContextMenu>

@@ -1,9 +1,12 @@
 namespace Snapr.Core.Settings;
 
+/// <summary>Global hotkeys. An empty string disables that hotkey.</summary>
 public sealed record HotkeySettings(
     string ImageCapture = "PrintScreen",
     string VideoCapture = "Shift+PrintScreen",
-    string ScrollingCapture = "Ctrl+PrintScreen");
+    string ScrollingCapture = "Ctrl+PrintScreen",
+    string RepeatLastCapture = "Ctrl+Alt+PrintScreen",
+    string VideoPauseResume = "Ctrl+Shift+PrintScreen");
 
 public sealed record AppSettings
 {

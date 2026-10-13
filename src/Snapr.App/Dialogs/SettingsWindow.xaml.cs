@@ -27,6 +27,8 @@ public partial class SettingsWindow : Window
         ImageHotkey.Text = s.Hotkeys.ImageCapture;
         VideoHotkey.Text = s.Hotkeys.VideoCapture;
         ScrollHotkey.Text = s.Hotkeys.ScrollingCapture;
+        RepeatHotkey.Text = s.Hotkeys.RepeatLastCapture;
+        PauseHotkey.Text = s.Hotkeys.VideoPauseResume;
         DelaySlider.Value = s.CaptureDelaySeconds;
         CursorCheck.IsChecked = s.IncludeCursor;
         PngRadio.IsChecked = s.ExportFormat != "jpg";
@@ -60,7 +62,8 @@ public partial class SettingsWindow : Window
     {
         e.Handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (HotkeyGesture.Format(Keyboard.Modifiers, key) is { } gesture) ((TextBox)sender).Text = gesture;
+        if (Keyboard.Modifiers == ModifierKeys.None && key is Key.Back or Key.Delete) ((TextBox)sender).Text = "";
+        else if (HotkeyGesture.Format(Keyboard.Modifiers, key) is { } gesture) ((TextBox)sender).Text = gesture;
     }
 
     void Delay_Changed(object sender, RoutedPropertyChangedEventArgs<double> e) => DelayValue.Text = $"{(int)e.NewValue} s";
@@ -86,7 +89,8 @@ public partial class SettingsWindow : Window
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        var hotkeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text };
+        var hotkeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text }
+            .Where(h => h.Length > 0).ToArray();   // empty = disabled
         if (hotkeys.Any(h => !HotkeyGesture.TryParse(h, out _, out _)))
         {
             MessageBox.Show(this, "One of the hotkeys isn't valid. Click the box and press a key combination.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -100,7 +104,7 @@ public partial class SettingsWindow : Window
         var ffmpeg = FfmpegBox.Text.Trim();
         _app.UpdateSettings(_app.Settings with
         {
-            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text),
+            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text),
             CaptureDelaySeconds = (int)DelaySlider.Value,
             IncludeCursor = CursorCheck.IsChecked == true,
             ExportFormat = JpgRadio.IsChecked == true ? "jpg" : "png",

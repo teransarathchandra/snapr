@@ -26,8 +26,16 @@ It is a single portable `.exe`: no installer and no admin rights.
 | Capture image | Print Screen |
 | Record video (press again to stop) | Shift + Print Screen |
 | Scrolling capture | Ctrl + Print Screen |
+| Repeat last capture | Ctrl + Alt + Print Screen |
+| Start, pause or resume a recording | Ctrl + Shift + Print Screen |
 
 While selecting: drag for a region, click a window, Space for all screens, C to copy without opening the editor, T to grab text, Esc to cancel.
+
+Editor shortcuts: Ctrl+Z / Alt+Backspace undo, Ctrl+Y redo, Ctrl+C copy (the selected object, or the whole image),
+Ctrl+X cut, Ctrl+V paste (a Snapr object, or a clipboard picture as a new capture), Delete delete, Ctrl+D or Esc
+deselect, Ctrl+S save, Ctrl+Shift+S save as image, Ctrl+O open, Ctrl+Shift+N new from clipboard, Ctrl+W close,
+Ctrl+P print, Ctrl+= / Ctrl+− zoom, Ctrl+0 fit. Tool keys: V select, A arrow, T text, K callout, S shape, P pen,
+H highlighter, N step, B blur, M magnify, C crop, E eraser.
 
 If Windows reports Print Screen as in use, turn off Settings → Accessibility → Keyboard → "Use the Print screen key to open screen capture", or choose another hotkey in Snapr's Settings.
 

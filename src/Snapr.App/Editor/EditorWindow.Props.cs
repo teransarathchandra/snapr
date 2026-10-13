@@ -98,7 +98,15 @@ public partial class EditorWindow
         if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Pen)
             CheckRow("Shadow", style.Shadow, v => ChangeStyle(s => s with { Shadow = v }));
         if (kind == ToolKind.Step)
+        {
+            ChoiceRow("Style", [("1 2 3", StepStyle.Numbers), ("A B C", StepStyle.Letters)], options.Steps,
+                v => ChangeOptions(o => o with { Steps = v }));
+            if (selected is StepAnnotation step) StepValueRow(step);
             ButtonRow(("Restart numbering", () => Board.Apply(s => s.RestartSteps())));
+        }
+        if (selected is ArrowAnnotation or PenAnnotation or CalloutAnnotation)
+            ButtonRow(("Flip ↔", () => Board.ApplyToSelection(a => AnnotationGeometry.Flip(a, horizontal: true))),
+                      ("Flip ↕", () => Board.ApplyToSelection(a => AnnotationGeometry.Flip(a, horizontal: false))));
         if (kind == ToolKind.Crop)
         {
             Hint("Drag over the image to crop. Pixels outside are kept, so you can reset.");
@@ -185,6 +193,29 @@ public partial class EditorWindow
         };
         PropsPanel.Children.Add(header);
         PropsPanel.Children.Add(slider);
+    }
+
+    /// <summary>Edits one step's value; Enter or leaving the box commits, anything that isn't a number is ignored.</summary>
+    void StepValueRow(StepAnnotation step)
+    {
+        Label("Value");
+        var box = new TextBox { Text = step.Number.ToString(CultureInfo.InvariantCulture), Width = 80, HorizontalAlignment = HorizontalAlignment.Left };
+        AutomationProperties.SetName(box, "Step value");
+        void Commit()
+        {
+            if (long.TryParse(box.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out var v))
+            {
+                var n = (int)Math.Clamp(v, 1, 9999);
+                if (Board.State.Annotations.OfType<StepAnnotation>().FirstOrDefault(x => x.Id == step.Id)?.Number != n)
+                    Board.Apply(s => s.SetStepNumber(step.Id, n));
+            }
+            // Show the number the step really has, whatever was typed.
+            var now = Board.State.Annotations.OfType<StepAnnotation>().FirstOrDefault(x => x.Id == step.Id);
+            if (now is not null) box.Text = now.Number.ToString(CultureInfo.InvariantCulture);
+        }
+        box.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) { Commit(); e.Handled = true; } };
+        box.LostKeyboardFocus += (_, _) => Commit();
+        PropsPanel.Children.Add(box);
     }
 
     void ChoiceRow<T>(string label, (string Text, T Value)[] choices, T current, Action<T> pick)
