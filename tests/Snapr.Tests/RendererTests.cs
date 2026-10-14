@@ -146,4 +146,38 @@ public class RendererTests
         var img = DocumentRenderer.Render(Solid(100, 100, 0xFFFFFFFF), With(shape), applyEffects: false);
         Assert.NotEqual(0xFFFFFFFFu, Px(img, 64, 64));
     });
+
+    [Fact]
+    public void Image_object_draws_its_pixels_at_its_bounds() => Sta.Run(() =>
+    {
+        var png = Convert.ToBase64String(ImageIo.EncodePng(Solid(4, 4, 0xFFFF0000)));
+        var img = DocumentRenderer.Render(Solid(50, 50, 0xFFFFFFFF), With(new ImageAnnotation(new(10, 10, 20, 20), png)), false);
+        Assert.Equal(0xFFFF0000u, Px(img, 20, 20));
+        Assert.Equal(0xFFFFFFFFu, Px(img, 5, 5));
+    });
+
+    [Fact]
+    public void Broken_image_object_draws_a_placeholder() => Sta.Run(() =>
+    {
+        var img = DocumentRenderer.Render(Solid(50, 50, 0xFFFFFFFF), With(new ImageAnnotation(new(10, 10, 20, 20), "not base64!")), false);
+        Assert.Equal(0xFFD4D4D8u, Px(img, 20, 20));
+    });
+
+    [Fact]
+    public void Zero_and_huge_font_sizes_render_without_throwing() => Sta.Run(() =>
+    {
+        var state = With(
+            new TextAnnotation(new(5, 5), "a", "Segoe UI", 0, false, "#FF000000"),
+            new TextAnnotation(new(5, 5), "a", "Segoe UI", 1e9, false, "#FF000000"),
+            new StepAnnotation(new(50, 50), 1, 0, "#FF000000", "#FFFFFFFF"));
+        DocumentRenderer.Render(Solid(100, 100, 0xFFFFFFFF), state, applyEffects: false);
+    });
+
+    [Theory]
+    [InlineData("file://evil/share/#Arial", "Segoe UI")]
+    [InlineData("\\\\evil\\share#X", "Segoe UI")]
+    [InlineData("Arial", "Arial")]
+    [InlineData("", "Segoe UI")]
+    public void Font_family_with_a_location_falls_back(string family, string expected) =>
+        Assert.Equal(expected, DocumentRenderer.SafeFontFamily(family));
 }

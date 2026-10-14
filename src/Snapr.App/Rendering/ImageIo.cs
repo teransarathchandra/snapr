@@ -2,6 +2,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Snapr.Core.Output;
 using Snapr.Core.Stitching;
 
 namespace Snapr.App.Rendering;
@@ -29,6 +30,33 @@ public static class ImageIo
     {
         var encoder = new JpegBitmapEncoder { QualityLevel = Math.Clamp(quality, 1, 100) };
         encoder.Frames.Add(BitmapFrame.Create(FlattenOnWhite(image)));
+        using var ms = new MemoryStream();
+        encoder.Save(ms);
+        return ms.ToArray();
+    }
+
+    public static byte[] EncodeGif(BitmapSource image) => Encode(new GifBitmapEncoder(), FlattenOnWhite(image));
+
+    public static byte[] EncodeBmp(BitmapSource image) => Encode(new BmpBitmapEncoder(), FlattenOnWhite(image));
+
+    /// <summary>A one-page PDF of the image (transparent areas white), written by Snapr's own PDF writer.</summary>
+    public static byte[] EncodePdf(BitmapSource image)
+    {
+        var frame = ToFrame(FlattenOnWhite(image));
+        var rgb = new byte[frame.Width * frame.Height * 3];
+        for (int i = 0, j = 0; i < frame.Pixels.Length; i++)
+        {
+            var p = frame.Pixels[i];
+            rgb[j++] = (byte)(p >> 16);
+            rgb[j++] = (byte)(p >> 8);
+            rgb[j++] = (byte)p;
+        }
+        return PdfWriter.SingleImagePage(frame.Width, frame.Height, rgb);
+    }
+
+    static byte[] Encode(BitmapEncoder encoder, BitmapSource image)
+    {
+        encoder.Frames.Add(BitmapFrame.Create(image));
         using var ms = new MemoryStream();
         encoder.Save(ms);
         return ms.ToArray();

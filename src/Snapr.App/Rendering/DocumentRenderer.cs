@@ -1,8 +1,11 @@
+using System.Collections.Concurrent;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Snapr.Core;
+using Snapr.Core.Interop;
 
 namespace Snapr.App.Rendering;
 
@@ -63,6 +66,7 @@ public static class DocumentRenderer
             case PenAnnotation x: DrawPolyline(dc, x.Points, Pen(x.Color, x.Width)); break;
             case BlurAnnotation x: DrawBlur(dc, src, x); break;
             case MagnifyAnnotation x: DrawMagnify(dc, src, x); break;
+            case ImageAnnotation x: DrawImageObject(dc, x); break;
         }
     }
 
@@ -79,11 +83,15 @@ public static class DocumentRenderer
         return pen;
     }
 
+    /// <summary>"Segoe UI" for an empty family or one that is a font location (UNC path, URI, folder) - WPF would fetch it, leaking credentials.</summary>
+    public static string SafeFontFamily(string? name) =>
+        string.IsNullOrWhiteSpace(name) || name.IndexOfAny(['#', '/', '\\', ':']) >= 0 ? "Segoe UI" : name;
+
     static FormattedText Text(string text, string family, double size, bool bold, string color, double maxWidth)
     {
         var ft = new FormattedText(text, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
-            new Typeface(new FontFamily(family), FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
-            size, ImageIo.Brush(color), 1.0);
+            new Typeface(new FontFamily(SafeFontFamily(family)), FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
+            double.IsFinite(size) ? Math.Clamp(size, 1, 2000) : 1, ImageIo.Brush(color), 1.0);
         if (!double.IsNaN(maxWidth)) ft.MaxTextWidth = maxWidth;
         return ft;
     }
@@ -270,5 +278,36 @@ public static class DocumentRenderer
         dc.Pop();
         dc.DrawGeometry(null, Pen("#FFFFFFFF", 3), lens);
         dc.DrawRectangle(null, Pen("#99FFFFFF", 1), new Rect(s.X, s.Y, s.Width, s.Height));
+    }
+
+    static readonly Brush PlaceholderFill = ImageIo.Brush("#FFD4D4D8");
+
+    // Decoded pictures keyed by object ID and payload length; null = undecodable. A capture holds few image
+    // objects, so the cache is simply cleared when it grows.
+    static readonly ConcurrentDictionary<(Guid, int), BitmapSource?> Pictures = new();
+
+    static void DrawImageObject(DrawingContext dc, ImageAnnotation x)
+    {
+        var r = R(x.Bounds);
+        if (Picture(x) is { } picture) dc.DrawImage(picture, r);
+        else dc.DrawRectangle(PlaceholderFill, Pen("#FF71717A", 1), r);
+    }
+
+    static BitmapSource? Picture(ImageAnnotation x)
+    {
+        if (Pictures.Count > 64) Pictures.Clear();
+        return Pictures.GetOrAdd((x.Id, x.Png.Length), _ =>
+        {
+            try
+            {
+                var bytes = Convert.FromBase64String(x.Png);
+                return PngInfo.Size(bytes) is var (w, h) && (long)w * h <= SnagxReader.MaxTotalPixels ? ImageIo.DecodePng(bytes) : null;
+            }
+            catch (Exception ex) when (ex is FormatException or NotSupportedException or FileFormatException or ArgumentException or IOException
+                                           or OutOfMemoryException)
+            {
+                return null;
+            }
+        });
     }
 }

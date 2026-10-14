@@ -13,6 +13,7 @@ public static class AnnotationGeometry
         PenAnnotation x => PointsBounds(x.Points).Inflate(x.Width),
         BlurAnnotation x => x.Bounds,
         MagnifyAnnotation x => MagnifyTarget(x),
+        ImageAnnotation x => x.Bounds,
         _ => default,
     };
 
@@ -67,6 +68,7 @@ public static class AnnotationGeometry
         PenAnnotation x => x with { Points = x.Points.Select(q => q.Offset(dx, dy)).ToArray() },
         BlurAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         MagnifyAnnotation x => x with { TargetCenter = x.TargetCenter.Offset(dx, dy) },
+        ImageAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         _ => a,
     };
 
@@ -78,6 +80,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => BottomRight(x.Bounds),
         BlurAnnotation x => BottomRight(x.Bounds),
         MagnifyAnnotation x => BottomRight(MagnifyTarget(x)),
+        ImageAnnotation x => BottomRight(x.Bounds),
         _ => null,
     };
 
@@ -91,6 +94,7 @@ public static class AnnotationGeometry
         CalloutAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         HighlightAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         BlurAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
+        ImageAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(2 * (p.X - x.TargetCenter.X) / Math.Max(1, x.SourceBounds.W), 1.5, 4) },
         _ => a,
     };
@@ -133,6 +137,7 @@ public static class AnnotationGeometry
         StepAnnotation x => fallback with { Color = x.Fill, FontSize = x.Size / 1.6, Shadow = x.Shadow },
         HighlightAnnotation x => fallback with { Color = ColorText.WithAlpha(x.Color, 0xFF), Shadow = false },
         PenAnnotation x => fallback with { Color = x.Color, Width = x.Width, Shadow = x.Shadow },
+        ImageAnnotation x => fallback with { Shadow = x.Shadow },
         _ => fallback,
     };
 

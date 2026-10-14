@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ed="clr-namespace:Snapr.App.Editor"
         Title="Snapr" Width="1280" Height="820" MinWidth="900" MinHeight="560"
-        Style="{StaticResource SnaprWindow}" WindowStartupLocation="CenterScreen">
+        Style="{StaticResource SnaprWindow}" WindowStartupLocation="CenterScreen"
+        AllowDrop="True" DragOver="Window_DragOver" Drop="Window_Drop">
   <DockPanel>
     <Border DockPanel.Dock="Top" Height="48" Background="{StaticResource PanelBrush}"
             BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="0,0,0,1">
@@ -25,7 +26,13 @@
               <ContextMenu>
                 <MenuItem Header="PNG image…" Click="ExportPng_Click"/>
                 <MenuItem Header="JPG image…" Click="ExportJpg_Click"/>
+                <MenuItem Header="GIF image…" Click="ExportGif_Click"/>
+                <MenuItem Header="BMP image…" Click="ExportBmp_Click"/>
+                <MenuItem Header="PDF document…" Click="ExportPdf_Click"/>
                 <MenuItem Header="Snapr file (.snapr)…" Click="ExportSnapr_Click"/>
+                <Separator/>
+                <MenuItem Header="Print…" InputGestureText="Ctrl+P" Click="PrintFit_Click"/>
+                <MenuItem Header="Print actual size…" Click="PrintActual_Click"/>
                 <Separator/>
                 <MenuItem Header="Show in folder" Click="ShowInFolder_Click"/>
               </ContextMenu>
@@ -73,6 +80,14 @@
         <StackPanel Orientation="Horizontal">
           <TextBlock x:Name="SaveBannerText" Text="Not saved" Foreground="White" VerticalAlignment="Center" MaxWidth="520" TextTrimming="CharacterEllipsis"/>
           <Button Content="Retry" Margin="12,0,0,0" Click="RetrySave_Click"/>
+        </StackPanel>
+      </Border>
+      <Border x:Name="InfoBanner" Visibility="Collapsed" VerticalAlignment="Top" HorizontalAlignment="Center"
+              Margin="0,56,0,0" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource PanelBorderBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="12,6">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock x:Name="InfoBannerText" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" MaxWidth="640" TextWrapping="Wrap"/>
+          <Button Content="Dismiss" Margin="12,0,0,0" Click="DismissNotice_Click"/>
         </StackPanel>
       </Border>
       <Button x:Name="ZoomButton" Content="Fit" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="12"

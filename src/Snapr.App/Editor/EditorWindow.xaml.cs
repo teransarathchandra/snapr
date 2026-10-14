@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Printing;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -12,6 +13,7 @@ using Microsoft.Win32;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
+using Snapr.Core.Output;
 
 namespace Snapr.App.Editor;
 
@@ -72,6 +74,7 @@ public partial class EditorWindow : Window
         TitleText.Text = $"{Path.GetFileNameWithoutExtension(path)}  ·  {doc.PixelWidth} × {doc.PixelHeight}";
         _manualZoom = null;
         _pasteCount = 0;
+        InfoBanner.Visibility = Visibility.Collapsed;
         UpdateEmptyState();
         UpdateUndoButtons();
         if (saveNow) SaveNow();
@@ -79,6 +82,9 @@ public partial class EditorWindow : Window
         ShowAndActivate();
         Dispatcher.BeginInvoke(ApplyZoom, DispatcherPriority.Loaded);
     }
+
+    /// <summary>True when the editor is showing this saved file, so reloading it from disk would drop pending edits.</summary>
+    public bool IsShowing(string fullPath) => _path is not null && string.Equals(_path, fullPath, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Shows the current capture, or the most recent saved one, or the empty state.</summary>
     public void ShowLatest()
@@ -242,39 +248,66 @@ public partial class EditorWindow : Window
             Math.Max(1, Math.Min(_base.PixelHeight - y, (int)Math.Ceiling(a.Bottom) - y)));
     }
 
-    void Print()
+    /// <summary>Prints the image with effects: fitted to the page (never enlarged) or at actual size, centred.</summary>
+    void Print(bool fit = true)
     {
         if (_doc is null) return;
         Board.CommitTextEditor();
-        var dialog = new PrintDialog();
-        if (dialog.ShowDialog() != true) return;
         var image = RenderForExport();
-        var scale = Math.Min(1, Math.Min(dialog.PrintableAreaWidth / image.Width, dialog.PrintableAreaHeight / image.Height));
-        var visual = new DrawingVisual();
-        using (var dc = visual.RenderOpen()) dc.DrawImage(image, new Rect(0, 0, image.Width * scale, image.Height * scale));
-        dialog.PrintVisual(visual, Path.GetFileNameWithoutExtension(_path) ?? "Snapr");
+        var dialog = new PrintDialog();
+        try
+        {
+            if (PrintLayout.WantsLandscape(image.Width, image.Height) && dialog.PrintTicket is { } ticket)
+                ticket.PageOrientation = PageOrientation.Landscape;
+            if (dialog.ShowDialog() != true) return;
+            // The printer's imageable area is smaller than the paper (hardware margins); fit to that, not the paper.
+            var area = dialog.PrintQueue.GetPrintCapabilities(dialog.PrintTicket).PageImageableArea;
+            double ox = area?.OriginWidth ?? 0, oy = area?.OriginHeight ?? 0;
+            double aw = area?.ExtentWidth ?? dialog.PrintableAreaWidth, ah = area?.ExtentHeight ?? dialog.PrintableAreaHeight;
+            var r = PrintLayout.Place(image.Width, image.Height, aw, ah, fit);
+            var visual = new DrawingVisual();
+            using (var dc = visual.RenderOpen())
+            {
+                dc.PushClip(new RectangleGeometry(new Rect(ox, oy, aw, ah)));
+                dc.DrawImage(image, new Rect(ox + r.X, oy + r.Y, r.W, r.H));
+                dc.Pop();
+            }
+            dialog.PrintVisual(visual, Path.GetFileNameWithoutExtension(_path) ?? "Snapr");
+        }
+        catch (Exception ex) when (ex is PrintSystemException or InvalidOperationException)
+        {
+            Log.Write("Print failed", ex);
+            MessageBox.Show(this, $"Couldn't print.\n\n{ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     void ExportImage(string format)
     {
         if (_doc is null) return;
         Board.CommitTextEditor();
+        (string Filter, Func<BitmapSource, byte[]> Encode) export = format switch
+        {
+            "jpg" => ("JPEG image|*.jpg", i => ImageIo.EncodeJpg(i, _app.Settings.JpgQuality)),
+            "gif" => ("GIF image|*.gif", ImageIo.EncodeGif),
+            "bmp" => ("Bitmap image|*.bmp", ImageIo.EncodeBmp),
+            "pdf" => ("PDF document|*.pdf", ImageIo.EncodePdf),
+            _ => ("PNG image|*.png", ImageIo.EncodePng),
+        };
         var dialog = new SaveFileDialog
         {
-            Filter = format == "jpg" ? "JPEG image|*.jpg" : "PNG image|*.png",
+            Filter = export.Filter,
             FileName = Path.GetFileNameWithoutExtension(_path) + "." + format,
             InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
         };
         if (dialog.ShowDialog(this) != true) return;
         try
         {
-            var image = RenderForExport();
-            File.WriteAllBytes(dialog.FileName, format == "jpg" ? ImageIo.EncodeJpg(image, _app.Settings.JpgQuality) : ImageIo.EncodePng(image));
+            File.WriteAllBytes(dialog.FileName, export.Encode(RenderForExport()));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             Log.Write($"Export failed: {dialog.FileName}", ex);
-            MessageBox.Show(this, $"Couldn't save the image.\n\n{ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"Couldn't save the file.\n\n{ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -322,6 +355,11 @@ public partial class EditorWindow : Window
     void Save_Click(object sender, RoutedEventArgs e) => ExportImage(_app.Settings.ExportFormat);
     void ExportPng_Click(object sender, RoutedEventArgs e) => ExportImage("png");
     void ExportJpg_Click(object sender, RoutedEventArgs e) => ExportImage("jpg");
+    void ExportGif_Click(object sender, RoutedEventArgs e) => ExportImage("gif");
+    void ExportBmp_Click(object sender, RoutedEventArgs e) => ExportImage("bmp");
+    void ExportPdf_Click(object sender, RoutedEventArgs e) => ExportImage("pdf");
+    void PrintFit_Click(object sender, RoutedEventArgs e) => Print(fit: true);
+    void PrintActual_Click(object sender, RoutedEventArgs e) => Print(fit: false);
     void ExportSnapr_Click(object sender, RoutedEventArgs e) => ExportSnapr();
 
     void Export_Click(object sender, RoutedEventArgs e)
@@ -428,6 +466,28 @@ public partial class EditorWindow : Window
         }
         if (string.Equals(item.Path, _path, StringComparison.OrdinalIgnoreCase)) return;
         if (TryLoad(item.Path) is { } doc) Open(doc, item.Path, saveNow: false);
+    }
+
+    // ---------- Notices and drag-and-drop ----------
+
+    /// <summary>A one-time note on the current capture, such as what a Snagit import approximated.</summary>
+    public void ShowNotice(string text)
+    {
+        InfoBannerText.Text = text;
+        InfoBanner.Visibility = Visibility.Visible;
+    }
+
+    void DismissNotice_Click(object sender, RoutedEventArgs e) => InfoBanner.Visibility = Visibility.Collapsed;
+
+    void Window_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    void Window_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) _app.OpenImageFile(files[0]);
     }
 
     // ---------- Keyboard and lifetime ----------

@@ -17,6 +17,7 @@ public enum MagnifyShape { Circle, Rectangle }
 [JsonDerivedType(typeof(PenAnnotation), "pen")]
 [JsonDerivedType(typeof(BlurAnnotation), "blur")]
 [JsonDerivedType(typeof(MagnifyAnnotation), "magnify")]
+[JsonDerivedType(typeof(ImageAnnotation), "image")]
 public abstract record Annotation
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -47,3 +48,6 @@ public sealed record PenAnnotation(IReadOnlyList<Pt> Points, string Color, doubl
 public sealed record BlurAnnotation(Rct Bounds, BlurMode Mode, int Strength) : Annotation;
 
 public sealed record MagnifyAnnotation(Rct SourceBounds, Pt TargetCenter, double Zoom, MagnifyShape Shape) : Annotation;
+
+/// <summary>A picture placed on the capture (for example a Snagit image object). Png is base64-encoded PNG bytes.</summary>
+public sealed record ImageAnnotation(Rct Bounds, string Png) : Annotation;
