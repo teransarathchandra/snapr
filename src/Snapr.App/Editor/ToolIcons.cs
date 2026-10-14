@@ -22,6 +22,7 @@ public static class ToolIcons
         [ToolKind.Magnify] = "M8.5,3 A5.5,5.5 0 1 1 8.49,3 Z M12.5,12.5 L17,17",
         [ToolKind.Crop] = "M6,2 V14 H18 M2,6 H14 V18",
         [ToolKind.Eraser] = "M4,14 L11,7 L16,12 L11,17 H6 Z M8,10 L13,15",
+        [ToolKind.Fill] = "M3,10 L9,4 L15,10 L9,16 Z M3,10 H15 M16,12 C17.5,14.5 18,15.5 16.8,16.6 C15.8,17.4 14.6,16 16,12 Z",
     };
 
     public static UIElement Create(ToolKind tool) => new Path

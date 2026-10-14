@@ -21,6 +21,20 @@
           <Button Content="Grab Text" ToolTip="Copy the text in the selected object's area, or the whole image" Click="GrabText_Click"/>
           <Button Content="Copy" ToolTip="Copy image (Ctrl+C copies the selected object)" Click="Copy_Click"/>
           <Button Content="Save" ToolTip="Save as image (Ctrl+Shift+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
+          <Button x:Name="ImageButton" Content="Image ▾" ToolTip="Rotate, flip, resize or add margins to the image" Click="ImageMenu_Click">
+            <Button.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Rotate right" Click="RotateRight_Click"/>
+                <MenuItem Header="Rotate left" Click="RotateLeft_Click"/>
+                <MenuItem Header="Rotate 180°" Click="Rotate180_Click"/>
+                <MenuItem Header="Flip horizontal" Click="FlipHorizontal_Click"/>
+                <MenuItem Header="Flip vertical" Click="FlipVertical_Click"/>
+                <Separator/>
+                <MenuItem Header="Resize image…" Click="ResizeImage_Click"/>
+                <MenuItem Header="Canvas size…" Click="CanvasSize_Click"/>
+              </ContextMenu>
+            </Button.ContextMenu>
+          </Button>
           <Button x:Name="ExportButton" Content="Export ▾" Click="Export_Click">
             <Button.ContextMenu>
               <ContextMenu>

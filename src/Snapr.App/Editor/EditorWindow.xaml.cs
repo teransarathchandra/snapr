@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
+using Snapr.App.Dialogs;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
@@ -24,7 +25,7 @@ public partial class EditorWindow : Window
         (ToolKind.Move, "Select and move", Key.V), (ToolKind.Arrow, "Arrow", Key.A), (ToolKind.Text, "Text", Key.T),
         (ToolKind.Callout, "Callout", Key.K), (ToolKind.Shape, "Shape", Key.S), (ToolKind.Pen, "Pen", Key.P),
         (ToolKind.Highlight, "Highlighter", Key.H), (ToolKind.Step, "Step", Key.N), (ToolKind.Blur, "Blur", Key.B),
-        (ToolKind.Magnify, "Magnify", Key.M), (ToolKind.Crop, "Crop", Key.C), (ToolKind.Eraser, "Eraser", Key.E),
+        (ToolKind.Magnify, "Magnify", Key.M), (ToolKind.Crop, "Crop", Key.C), (ToolKind.Eraser, "Eraser", Key.E), (ToolKind.Fill, "Fill", Key.F),
     ];
 
     readonly AppController _app;
@@ -37,6 +38,7 @@ public partial class EditorWindow : Window
     bool _dirty;
     double? _manualZoom;   // null = fit to window; otherwise relative to 100%
     int _pasteCount;
+    readonly EditedImageCache _images = new();
     bool _allowClose;
     string? _lastMergeKey;
     DateTime _lastMergeAt;
@@ -70,8 +72,8 @@ public partial class EditorWindow : Window
         _base = ImageIo.ToBgra(ImageIo.DecodePng(doc.BasePng));
         _undo = new UndoStack(doc.State);
         _dirty = saveNow;
-        Board.Load(_base, doc.State);
-        TitleText.Text = $"{Path.GetFileNameWithoutExtension(path)}  ·  {doc.PixelWidth} × {doc.PixelHeight}";
+        Board.Load(CurrentImage(), doc.State);
+        UpdateTitle();
         _manualZoom = null;
         _pasteCount = 0;
         InfoBanner.Visibility = Visibility.Collapsed;
@@ -81,6 +83,25 @@ public partial class EditorWindow : Window
         else RefreshRecents();
         ShowAndActivate();
         Dispatcher.BeginInvoke(ApplyZoom, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>The original pixels with the document's image edits applied (spec parity 4 §6).</summary>
+    BitmapSource CurrentImage() => _images.Get(_base!, _undo!.Current.Edits);
+
+    void UpdateTitle()
+    {
+        if (_doc is null || _path is null) return;
+        var image = CurrentImage();
+        TitleText.Text = $"{Path.GetFileNameWithoutExtension(_path)}  ·  {image.PixelWidth} × {image.PixelHeight}";
+    }
+
+    /// <summary>One image edit (rotate, flip, resize, margins) as one undo step; objects and crop follow it.</summary>
+    void ApplyImageEdit(ImageEdit edit)
+    {
+        if (_doc is null) return;
+        Board.CommitTextEditor();
+        var image = CurrentImage();
+        Board.Apply(s => s.ApplyEdit((image.PixelWidth, image.PixelHeight), edit));
     }
 
     /// <summary>True when the editor is showing this saved file, so reloading it from disk would drop pending edits.</summary>
@@ -123,6 +144,7 @@ public partial class EditorWindow : Window
         var hasDoc = _doc is not null;
         EmptyText.Visibility = hasDoc ? Visibility.Collapsed : Visibility.Visible;
         CanvasFrame.Visibility = ZoomButton.Visibility = hasDoc ? Visibility.Visible : Visibility.Collapsed;
+        ImageButton.IsEnabled = hasDoc;
     }
 
     // ---------- Edits, undo, autosave ----------
@@ -143,7 +165,9 @@ public partial class EditorWindow : Window
     void ShowState()
     {
         _doc!.State = _undo!.Current;
+        Board.SetImage(CurrentImage());
         Board.SetState(_undo.Current);
+        UpdateTitle();
         _dirty = true;
         _autosave.Stop();
         _autosave.Start();
@@ -165,7 +189,7 @@ public partial class EditorWindow : Window
         if (_doc is null || _path is null || _base is null) return true;
         try
         {
-            var thumb = ImageIo.EncodePng(ImageIo.Thumbnail(DocumentRenderer.Render(_base, _doc.State, applyEffects: false)));
+            var thumb = ImageIo.EncodePng(ImageIo.Thumbnail(DocumentRenderer.Render(CurrentImage(), _doc.State, applyEffects: false)));
             SnaprFile.Save(_doc, thumb, _path);
             _dirty = false;
             SaveBanner.Visibility = Visibility.Collapsed;
@@ -192,7 +216,7 @@ public partial class EditorWindow : Window
 
     // ---------- Output ----------
 
-    BitmapSource RenderForExport() => DocumentRenderer.Render(_base!, _undo!.Current, applyEffects: true);
+    BitmapSource RenderForExport() => DocumentRenderer.Render(CurrentImage(), _undo!.Current, applyEffects: true);
 
     /// <summary>Returns true only if the clipboard write succeeded.</summary>
     bool Copy(bool wholeImage = false)
@@ -275,20 +299,21 @@ public partial class EditorWindow : Window
     /// <summary>The document (no effects) rendered and cut to an area, for copying one object to other apps.</summary>
     BitmapSource RenderArea(Rct area)
     {
-        var full = DocumentRenderer.Render(_base!, _undo!.Current with { Crop = null }, applyEffects: false);
+        var full = DocumentRenderer.Render(CurrentImage(), _undo!.Current with { Crop = null }, applyEffects: false);
         var crop = new CroppedBitmap(full, PixelRect(area));
         crop.Freeze();
         return crop;
     }
 
-    /// <summary>Whole-pixel part of an area inside the base image; the whole image if the area is empty or outside.</summary>
+    /// <summary>Whole-pixel part of an area inside the current image; the whole image if the area is empty or outside.</summary>
     Int32Rect PixelRect(Rct area)
     {
-        var a = area.Intersect(new Rct(0, 0, _base!.PixelWidth, _base.PixelHeight));
-        if (a.IsEmpty) return new Int32Rect(0, 0, _base.PixelWidth, _base.PixelHeight);
+        var image = CurrentImage();
+        var a = area.Intersect(new Rct(0, 0, image.PixelWidth, image.PixelHeight));
+        if (a.IsEmpty) return new Int32Rect(0, 0, image.PixelWidth, image.PixelHeight);
         int x = (int)Math.Floor(a.X), y = (int)Math.Floor(a.Y);
-        return new Int32Rect(x, y, Math.Max(1, Math.Min(_base.PixelWidth - x, (int)Math.Ceiling(a.Right) - x)),
-            Math.Max(1, Math.Min(_base.PixelHeight - y, (int)Math.Ceiling(a.Bottom) - y)));
+        return new Int32Rect(x, y, Math.Max(1, Math.Min(image.PixelWidth - x, (int)Math.Ceiling(a.Right) - x)),
+            Math.Max(1, Math.Min(image.PixelHeight - y, (int)Math.Ceiling(a.Bottom) - y)));
     }
 
     /// <summary>Prints the image with effects: fitted to the page (never enlarged) or at actual size, centred.</summary>
@@ -362,7 +387,7 @@ public partial class EditorWindow : Window
         if (dialog.ShowDialog(this) != true) return false;
         try
         {
-            SnaprFile.Save(_doc, ImageIo.EncodePng(ImageIo.Thumbnail(DocumentRenderer.Render(_base, _doc.State, false))), dialog.FileName);
+            SnaprFile.Save(_doc, ImageIo.EncodePng(ImageIo.Thumbnail(DocumentRenderer.Render(CurrentImage(), _doc.State, false))), dialog.FileName);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -411,6 +436,34 @@ public partial class EditorWindow : Window
         ExportButton.ContextMenu.IsOpen = true;
     }
 
+    void ImageMenu_Click(object sender, RoutedEventArgs e)
+    {
+        ImageButton.ContextMenu.PlacementTarget = ImageButton;
+        ImageButton.ContextMenu.IsOpen = true;
+    }
+
+    void RotateRight_Click(object sender, RoutedEventArgs e) => ApplyImageEdit(new RotateEdit(1));
+    void RotateLeft_Click(object sender, RoutedEventArgs e) => ApplyImageEdit(new RotateEdit(3));
+    void Rotate180_Click(object sender, RoutedEventArgs e) => ApplyImageEdit(new RotateEdit(2));
+    void FlipHorizontal_Click(object sender, RoutedEventArgs e) => ApplyImageEdit(new FlipEdit(true));
+    void FlipVertical_Click(object sender, RoutedEventArgs e) => ApplyImageEdit(new FlipEdit(false));
+
+    void ResizeImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (_doc is null) return;
+        var image = CurrentImage();
+        var dialog = new ResizeImageWindow(this, image.PixelWidth, image.PixelHeight);
+        if (dialog.ShowDialog() == true && dialog.Result is { } size) ApplyImageEdit(new ResizeEdit(size.W, size.H));
+    }
+
+    void CanvasSize_Click(object sender, RoutedEventArgs e)
+    {
+        if (_doc is null) return;
+        var image = CurrentImage();
+        var dialog = new CanvasSizeWindow(this, image.PixelWidth, image.PixelHeight, Board.CurrentStyle.Color);
+        if (dialog.ShowDialog() == true && dialog.Result is { } margins) ApplyImageEdit(margins);
+    }
+
     void ShowInFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_path is not null && File.Exists(_path)) Process.Start("explorer.exe", $"/select,\"{_path}\"");
@@ -419,7 +472,7 @@ public partial class EditorWindow : Window
     void GrabText_Click(object sender, RoutedEventArgs e)
     {
         if (_base is null) return;
-        var crop = new CroppedBitmap(_base, PixelRect(Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View));
+        var crop = new CroppedBitmap(CurrentImage(), PixelRect(Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View));
         crop.Freeze();
         _app.Fire(() => _app.GrabTextAsync(crop));
     }

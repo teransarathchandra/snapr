@@ -13,6 +13,9 @@ public sealed record DocumentEffects(BorderEffect? Border = null, bool Shadow = 
 public sealed record DocumentState(IReadOnlyList<Annotation> Annotations, Rct? Crop, DocumentEffects Effects, int NextStepNumber)
 {
     public static DocumentState Empty { get; } = new(Array.Empty<Annotation>(), null, DocumentEffects.None, 1);
+
+    /// <summary>Image edits replayed over the original pixels, in order (spec parity 4). Empty for older files.</summary>
+    public IReadOnlyList<ImageEdit> Edits { get; init; } = [];
 }
 
 public sealed record CaptureMeta(DateTimeOffset CapturedAt, CaptureKind Kind, string? SourceTitle);

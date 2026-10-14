@@ -69,6 +69,14 @@ public sealed class EditorCanvas : Canvas
         SelectionChanged?.Invoke();
     }
 
+    /// <summary>Replaces the image under the objects (after an image edit, undo or redo) without touching the selection.</summary>
+    public void SetImage(BitmapSource image)
+    {
+        _base = image;
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
     public void SetState(DocumentState state)
     {
         _state = state;
@@ -278,7 +286,7 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.Crop:
                 _cropDrag = Rct.FromPoints(_down, p);
                 break;
-            case ToolKind.Move or ToolKind.Step or ToolKind.Eraser or ToolKind.Pen:
+            case ToolKind.Move or ToolKind.Step or ToolKind.Eraser or ToolKind.Pen or ToolKind.Fill:
                 break;
             default:
                 _preview = AnnotationFactory.FromDrag(Tool, _down, p, CurrentStyle, Options) is { } a ? _state.Add(a) : null;
@@ -314,6 +322,10 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.Eraser:
                 if (_state.HitTest(p, 6 / Zoom) is { } hit) Commit(_state.Remove(hit.Id));
                 break;
+            case ToolKind.Fill:
+                if (Math.Abs(p.X - _down.X) * Zoom <= SystemParameters.MinimumHorizontalDragDistance
+                    && Math.Abs(p.Y - _down.Y) * Zoom <= SystemParameters.MinimumVerticalDragDistance) TryFill(p);
+                break;
             case ToolKind.Crop:
                 if (_cropDrag is { W: >= 4, H: >= 4 } c) Commit(_state.SetCrop(c, _base!.PixelWidth, _base.PixelHeight));
                 break;
@@ -328,6 +340,15 @@ public sealed class EditorCanvas : Canvas
         }
         ResetDrag();
         ReleaseMouseCapture();
+    }
+
+    /// <summary>Fill tool click (spec parity 4 §5): adds a fill edit unless the point is outside the image or already that colour.</summary>
+    void TryFill(Pt p)
+    {
+        int x = (int)Math.Floor(p.X), y = (int)Math.Floor(p.Y);
+        if (_base is null || x < 0 || y < 0 || x >= _base.PixelWidth || y >= _base.PixelHeight) return;
+        if (!ColorText.TryArgb(CurrentStyle.Color, out var argb) || ImageIo.PixelAt(_base, x, y) == argb) return;
+        Commit(_state.ApplyEdit((_base.PixelWidth, _base.PixelHeight), new FillEdit(x, y, CurrentStyle.Color, Options.FillTolerance)));
     }
 
     protected override void OnLostMouseCapture(MouseEventArgs e)

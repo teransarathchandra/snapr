@@ -72,5 +72,6 @@ public static class DocumentOps
     }
 
     public static bool SameAs(this DocumentState a, DocumentState b) =>
-        a.Annotations.SequenceEqual(b.Annotations) && a.Crop == b.Crop && a.Effects == b.Effects && a.NextStepNumber == b.NextStepNumber;
+        a.Annotations.SequenceEqual(b.Annotations) && a.Crop == b.Crop && a.Effects == b.Effects && a.NextStepNumber == b.NextStepNumber
+        && a.Edits.SequenceEqual(b.Edits);
 }

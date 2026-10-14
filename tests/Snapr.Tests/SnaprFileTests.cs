@@ -9,11 +9,18 @@ public sealed class SnaprFileTests : IDisposable
     readonly string _dir = Directory.CreateTempSubdirectory("snapr-tests").FullName;
     public void Dispose() => Directory.Delete(_dir, true);
 
-    static CaptureDocument Doc() => new()
+    /// <summary>PNG signature + an IHDR chunk header declaring w x h; the rest is not a decodable picture.</summary>
+    internal static byte[] PngHeader(int w, int h) =>
+    [
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, (byte)'I', (byte)'H', (byte)'D', (byte)'R',
+        (byte)(w >> 24), (byte)(w >> 16), (byte)(w >> 8), (byte)w, (byte)(h >> 24), (byte)(h >> 16), (byte)(h >> 8), (byte)h,
+    ];
+
+    static CaptureDocument Doc(byte[]? png = null, int w = 640, int h = 480) => new()
     {
-        BasePng = [1, 2, 3, 4],
-        PixelWidth = 640,
-        PixelHeight = 480,
+        BasePng = png ?? PngHeader(w, h),
+        PixelWidth = w,
+        PixelHeight = h,
         Dpi = 144,
         Meta = new(new DateTimeOffset(2026, 10, 13, 9, 30, 0, TimeSpan.Zero), CaptureKind.Window, "Notepad"),
         State = ModelJsonTests.SampleState(),
@@ -78,5 +85,31 @@ public sealed class SnaprFileTests : IDisposable
         using (var w = new StreamWriter(zip.CreateEntry("document.json").Open()))
             w.Write("""{"formatVersion":2}""");
         Assert.Throws<InvalidDataException>(() => SnaprFile.Load(path));
+    }
+
+    [Fact]
+    public void Load_refuses_a_base_image_that_is_not_the_stated_size()
+    {
+        var path = Path.Combine(_dir, "liar.snapr");
+        SnaprFile.Save(Doc(PngHeader(200, 100), 100, 50), [1], path);
+        var ex = Assert.Throws<InvalidDataException>(() => SnaprFile.Load(path));
+        Assert.Equal("The capture image does not match its stated size.", ex.Message);
+    }
+
+    [Fact]
+    public void Load_refuses_a_base_image_that_is_not_a_png()
+    {
+        var path = Path.Combine(_dir, "junk.snapr");
+        SnaprFile.Save(Doc([1, 2, 3]), [1], path);
+        Assert.Throws<InvalidDataException>(() => SnaprFile.Load(path));
+    }
+
+    [Fact]
+    public void Load_accepts_a_base_image_of_the_stated_size()
+    {
+        var path = Path.Combine(_dir, "ok.snapr");
+        SnaprFile.Save(Doc(w: 100, h: 50), [1], path);
+        var back = SnaprFile.Load(path);
+        Assert.Equal((100, 50), (back.PixelWidth, back.PixelHeight));
     }
 }

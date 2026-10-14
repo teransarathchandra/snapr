@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using Snapr.Core.Interop;
 
 namespace Snapr.Core;
 
@@ -40,15 +41,22 @@ public static class SnaprFile
         }
         if (m.FormatVersion != FormatVersion)
             throw new InvalidDataException($"Unsupported .snapr format version {m.FormatVersion}.");
+        var state = m.State ?? DocumentState.Empty;
+        if (state.Edits is null) state = state with { Edits = [] };   // "edits": null in a hand-edited file
+        var basePng = Read(zip, "base.png");
+        // The editor replays the edits on the real image, so the stated size must be the real size.
+        if (PngInfo.Size(basePng) != (m.PixelWidth, m.PixelHeight))
+            throw new InvalidDataException("The capture image does not match its stated size.");
+        ImageEditRules.Validate(state.Edits, m.PixelWidth, m.PixelHeight);
         return new CaptureDocument
         {
             Id = m.Id,
-            BasePng = Read(zip, "base.png"),
+            BasePng = basePng,
             PixelWidth = m.PixelWidth,
             PixelHeight = m.PixelHeight,
             Dpi = m.Dpi,
             Meta = m.Meta ?? throw new InvalidDataException("document.json has no meta."),
-            State = m.State ?? DocumentState.Empty,
+            State = state,
         };
     }
 

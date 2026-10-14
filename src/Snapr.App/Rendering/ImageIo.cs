@@ -115,4 +115,12 @@ public static class ImageIo
         b.Freeze();
         return b;
     }
+
+    /// <summary>One pixel as 0xAARRGGBB.</summary>
+    public static uint PixelAt(BitmapSource image, int x, int y)
+    {
+        var px = new uint[1];
+        new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0).CopyPixels(new Int32Rect(x, y, 1, 1), px, 4, 0);
+        return px[0];
+    }
 }

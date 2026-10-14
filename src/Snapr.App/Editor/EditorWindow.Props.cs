@@ -76,7 +76,7 @@ public partial class EditorWindow
         var name = Tools.First(t => t.Tool == kind).Name;
         Header(selected is null ? name : $"{name} · selected");
 
-        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Highlight or ToolKind.Pen)
+        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Highlight or ToolKind.Pen or ToolKind.Fill)
         {
             Label("Colour");
             SwatchRow(style.Color, c => ChangeStyle(s => s with { Color = c }));
@@ -113,6 +113,11 @@ public partial class EditorWindow
         if (selected is ArrowAnnotation or PenAnnotation or CalloutAnnotation)
             ButtonRow(("Flip ↔", () => Board.ApplyToSelection(a => AnnotationGeometry.Flip(a, horizontal: true))),
                       ("Flip ↕", () => Board.ApplyToSelection(a => AnnotationGeometry.Flip(a, horizontal: false))));
+        if (kind == ToolKind.Fill)
+        {
+            SliderRow("Tolerance", 0, 100, options.FillTolerance, v => ChangeOptions(o => o with { FillTolerance = (int)Math.Round(v) }, "tolerance"));
+            Hint("Click the image to fill the touching area of similar colour. Objects are not changed.");
+        }
         if (kind == ToolKind.Crop)
         {
             Hint("Drag over the image to crop. Pixels outside are kept, so you can reset.");

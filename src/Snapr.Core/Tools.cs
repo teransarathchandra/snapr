@@ -1,6 +1,6 @@
 namespace Snapr.Core;
 
-public enum ToolKind { Move, Arrow, Text, Callout, Shape, Pen, Highlight, Step, Blur, Magnify, Crop, Eraser }
+public enum ToolKind { Move, Arrow, Text, Callout, Shape, Pen, Highlight, Step, Blur, Magnify, Crop, Eraser, Fill }
 
 public enum ShapeOption { Rectangle, Ellipse, Line }
 
@@ -11,7 +11,7 @@ public sealed record ToolStyle(string Color, double Width, double FontSize, stri
 }
 
 public sealed record ToolOptions(ShapeOption Shape, BlurMode Blur, int BlurStrength, double Zoom, MagnifyShape Lens,
-    StepStyle Steps = StepStyle.Numbers)
+    StepStyle Steps = StepStyle.Numbers, int FillTolerance = 10)
 {
     public static ToolOptions Default { get; } = new(ShapeOption.Rectangle, BlurMode.Pixelate, 8, 2, MagnifyShape.Circle);
 }
