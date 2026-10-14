@@ -29,6 +29,37 @@ public static class ImageEditOps
         return s.Crop is { } c ? next.SetCrop(map.Area(c), nw, nh) : next;
     }
 
+    /// <summary>Removes every image edit and moves objects and the crop back onto the original image, undoing each edit's
+    /// geometry from last to first (spec parity 5 §5). Returns the same state when there are no edits.</summary>
+    public static DocumentState RevertEdits(this DocumentState s, (int W, int H) originalSize)
+    {
+        if (s.Edits.Count == 0) return s;
+        var sizes = new (int W, int H)[s.Edits.Count + 1];
+        sizes[0] = originalSize;
+        for (var i = 0; i < s.Edits.Count; i++) sizes[i + 1] = ImageEditRules.SizeAfter(sizes[i].W, sizes[i].H, s.Edits[i]);
+
+        var annotations = s.Annotations;
+        var crop = s.Crop;
+        for (var i = s.Edits.Count - 1; i >= 0; i--)
+        {
+            var map = Inverse(s.Edits[i], sizes[i].W, sizes[i].H, sizes[i + 1].W, sizes[i + 1].H);
+            annotations = annotations.Select(a => Transform(a, map)).ToArray();
+            if (crop is { } c) crop = map.Area(c);
+        }
+        var next = s with { Annotations = annotations, Edits = [], Crop = null };
+        return crop is { } nc ? next.SetCrop(nc, originalSize.W, originalSize.H) : next;
+    }
+
+    /// <summary>The mapping that undoes one edit: from the image after it (nw × nh) back to the image before it (w × h).</summary>
+    static Map Inverse(ImageEdit e, int w, int h, int nw, int nh) => e switch
+    {
+        RotateEdit r => Mapping(new RotateEdit(4 - r.QuarterTurns), nw, nh, w, h),
+        FlipEdit => Mapping(e, nw, nh, w, h),
+        ResizeEdit => Scaled((double)w / nw, (double)h / nh) with { Scale = 1 / (((double)nw / w + (double)nh / h) / 2) },
+        MarginsEdit m => new(p => new Pt(p.X - m.Left, p.Y - m.Top), 1, false),
+        _ => new(p => p, 1, false),
+    };
+
     /// <summary>How positions move, how lengths scale, and whether text/callout/image boxes keep their own size (on rotation).</summary>
     sealed record Map(Func<Pt, Pt> Point, double Scale, bool KeepBoxes)
     {

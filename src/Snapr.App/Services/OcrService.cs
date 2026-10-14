@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Snapr.App.Rendering;
+using Snapr.Core;
 using Windows.Globalization;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
@@ -15,15 +16,36 @@ public static class OcrService
 {
     public static bool IsAvailable => OcrEngine.AvailableRecognizerLanguages.Count > 0;
 
+    /// <summary>True when the engine will shrink this image, so small text may be missed.</summary>
+    public static bool WillDownscale(BitmapSource image) => Math.Max(image.PixelWidth, image.PixelHeight) > OcrEngine.MaxImageDimension;
+
     public static async Task<string> RecognizeAsync(BitmapSource image)
     {
-        var engine = OcrEngine.TryCreateFromUserProfileLanguages()
-                     ?? (OcrEngine.IsLanguageSupported(new Language("en-US")) ? OcrEngine.TryCreateFromLanguage(new Language("en-US")) : null)
-                     ?? throw new OcrUnavailableException();
+        var engine = CreateEngine();
         using var bitmap = await ToSoftwareBitmap(Prepare(image));
         var result = await engine.RecognizeAsync(bitmap);
         return string.Join(Environment.NewLine, result.Lines.Select(l => l.Text));
     }
+
+    /// <summary>Recognised lines with each word's box in pixels of <paramref name="image"/> (spec parity 5 §2).</summary>
+    public static async Task<IReadOnlyList<TextLine>> RecognizeLinesAsync(BitmapSource image)
+    {
+        var engine = CreateEngine();
+        var prepared = Prepare(image);
+        double sx = (double)image.PixelWidth / prepared.PixelWidth, sy = (double)image.PixelHeight / prepared.PixelHeight;
+        using var bitmap = await ToSoftwareBitmap(prepared);
+        var result = await engine.RecognizeAsync(bitmap);
+        return result.Lines
+            .Select(l => new TextLine(l.Words
+                .Select(w => new TextWord(w.Text, new Rct(w.BoundingRect.X * sx, w.BoundingRect.Y * sy, w.BoundingRect.Width * sx, w.BoundingRect.Height * sy)))
+                .ToArray()))
+            .ToArray();
+    }
+
+    static OcrEngine CreateEngine() =>
+        OcrEngine.TryCreateFromUserProfileLanguages()
+        ?? (OcrEngine.IsLanguageSupported(new Language("en-US")) ? OcrEngine.TryCreateFromLanguage(new Language("en-US")) : null)
+        ?? throw new OcrUnavailableException();
 
     /// <summary>Small captures are upscaled 2× (much better accuracy); huge ones are shrunk to the engine's limit.</summary>
     static BitmapSource Prepare(BitmapSource image)

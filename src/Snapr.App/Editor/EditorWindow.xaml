@@ -19,6 +19,7 @@
           <Button x:Name="UndoButton" Content="Undo" ToolTip="Undo (Ctrl+Z)" Click="Undo_Click"/>
           <Button x:Name="RedoButton" Content="Redo" ToolTip="Redo (Ctrl+Y)" Click="Redo_Click"/>
           <Button Content="Grab Text" ToolTip="Copy the text in the selected object's area, or the whole image" Click="GrabText_Click"/>
+          <Button x:Name="RedactButton" Content="Redact…" ToolTip="Find and cover emails, web addresses, card numbers, phone numbers or words you choose" Click="Redact_Click"/>
           <Button Content="Copy" ToolTip="Copy image (Ctrl+C copies the selected object)" Click="Copy_Click"/>
           <Button Content="Save" ToolTip="Save as image (Ctrl+Shift+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
           <Button x:Name="ImageButton" Content="Image ▾" ToolTip="Rotate, flip, resize or add margins to the image" Click="ImageMenu_Click">
@@ -32,6 +33,8 @@
                 <Separator/>
                 <MenuItem Header="Resize image…" Click="ResizeImage_Click"/>
                 <MenuItem Header="Canvas size…" Click="CanvasSize_Click"/>
+                <Separator/>
+                <MenuItem x:Name="RevertImageItem" Header="Revert to original image" Click="RevertImage_Click"/>
               </ContextMenu>
             </Button.ContextMenu>
           </Button>

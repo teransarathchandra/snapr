@@ -9,6 +9,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Annotate** with arrows, text, callouts, shapes, pen, highlighter, numbered steps, blur or pixelate, magnifier, crop and eraser. Every object stays editable; undo goes back 100 steps.
 - **Work with several objects**: select with a box, Shift+click or Ctrl+A; move, nudge with the arrow keys, copy, delete, group (Ctrl+Shift+G), align and distribute them. Paste (Ctrl+V) or drop pictures onto a capture to add them as movable images.
 - **Edit the image**: rotate, flip, resize, add margins (Image ▾) and fill areas with colour (Fill tool, F). Objects follow, every change can be undone while you edit, and the original capture pixels are always kept in the file.
+- **Redact** emails, web addresses, card numbers, phone numbers or words you choose: Snapr reads the text (Windows OCR) and covers what you tick with solid blocks or pixelation. **Revert to original image** (Image ▾) undoes all image edits, even after reopening. Covers are applied when you export, copy or print. The .snapr file keeps the original capture, so share an exported image.
 - **Effects**: border, drop shadow and torn edge.
 - **Grab Text** (OCR) from any part of the screen, using the OCR engine built into Windows.
 - **Scrolling capture** of long pages.

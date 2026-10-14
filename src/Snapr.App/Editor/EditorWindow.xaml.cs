@@ -145,6 +145,7 @@ public partial class EditorWindow : Window
         EmptyText.Visibility = hasDoc ? Visibility.Collapsed : Visibility.Visible;
         CanvasFrame.Visibility = ZoomButton.Visibility = hasDoc ? Visibility.Visible : Visibility.Collapsed;
         ImageButton.IsEnabled = hasDoc;
+        RedactButton.IsEnabled = hasDoc;
     }
 
     // ---------- Edits, undo, autosave ----------
@@ -438,6 +439,7 @@ public partial class EditorWindow : Window
 
     void ImageMenu_Click(object sender, RoutedEventArgs e)
     {
+        RevertImageItem.IsEnabled = _undo?.Current.Edits.Count > 0;
         ImageButton.ContextMenu.PlacementTarget = ImageButton;
         ImageButton.ContextMenu.IsOpen = true;
     }
@@ -464,6 +466,14 @@ public partial class EditorWindow : Window
         if (dialog.ShowDialog() == true && dialog.Result is { } margins) ApplyImageEdit(margins);
     }
 
+    /// <summary>Removes every image edit and moves objects back onto the original capture, as one undo step (spec parity 5 §5).</summary>
+    void RevertImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (_doc is null || _undo is null || _undo.Current.Edits.Count == 0) return;
+        Board.CommitTextEditor();
+        Board.Apply(s => s.RevertEdits((_doc.PixelWidth, _doc.PixelHeight)));
+    }
+
     void ShowInFolder_Click(object sender, RoutedEventArgs e)
     {
         if (_path is not null && File.Exists(_path)) Process.Start("explorer.exe", $"/select,\"{_path}\"");
@@ -475,6 +485,35 @@ public partial class EditorWindow : Window
         var crop = new CroppedBitmap(CurrentImage(), PixelRect(Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View));
         crop.Freeze();
         _app.Fire(() => _app.GrabTextAsync(crop));
+    }
+
+    /// <summary>Smart Redact (spec parity 5 §4): OCR the visible area, let the user pick matches, cover them as one undo step.</summary>
+    void Redact_Click(object sender, RoutedEventArgs e)
+    {
+        if (_doc is null) return;
+        Board.CommitTextEditor();
+        var area = PixelRect(Board.View);
+        var visible = new CroppedBitmap(CurrentImage(), area);
+        visible.Freeze();
+        var dialog = new RedactWindow(this, () => OcrService.RecognizeLinesAsync(visible), OcrService.WillDownscale(visible));
+        var doc = _doc;
+        var ok = dialog.ShowDialog() == true;
+        if (dialog.OcrMissing)
+        {
+            _app.ShowOcrHelp();
+            return;
+        }
+        if (!ReferenceEquals(doc, _doc)) return;   // another capture was opened while the dialog was up
+        if (!ok || dialog.Result is not { Boxes.Count: > 0 } result) return;
+        var image = CurrentImage();
+        var boxes = result.Boxes.Select(b => b.Offset(area.X, area.Y)).ToArray();
+        var (next, added) = Board.State.AddCovers(boxes, result.Look, (image.PixelWidth, image.PixelHeight));
+        Board.Apply(_ => next);
+        SetTool(ToolKind.Move);
+        Board.SelectIds(added);
+        var covers = next.Annotations.Where(a => added.Contains(a.Id)).Select(AnnotationGeometry.Bounds).ToArray();
+        if (next.Annotations.OfType<MagnifyAnnotation>().Any(m => covers.Any(c => !m.SourceBounds.Intersect(c).IsEmpty)))
+            ShowNotice("A magnifier still shows part of a covered area. Move or delete it before sharing.");
     }
 
     // ---------- Zoom ----------

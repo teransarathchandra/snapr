@@ -18,9 +18,7 @@ public sealed partial class AppController
         }
         catch (OcrUnavailableException)
         {
-            var answer = MessageBox.Show("Grab Text needs a Windows OCR language. Add one under Settings → Time & language → Language (any language with \"Optical character recognition\").\n\nOpen Settings now?",
-                "Snapr", MessageBoxButton.YesNo, MessageBoxImage.Information);
-            if (answer == MessageBoxResult.Yes) Process.Start(new ProcessStartInfo("ms-settings:regionlanguage") { UseShellExecute = true });
+            ShowOcrHelp();
             return;
         }
         if (string.IsNullOrWhiteSpace(text))
@@ -30,5 +28,13 @@ public sealed partial class AppController
         }
         if (!ClipboardImage.SetText(text)) Log.Write("Grab Text: clipboard busy, showing result only");
         TextResultWindow.Open(text);
+    }
+
+    /// <summary>Shown when Windows has no OCR language (Grab Text and Redact).</summary>
+    public void ShowOcrHelp()
+    {
+        var answer = MessageBox.Show("Reading text needs a Windows OCR language. Add one under Settings → Time & language → Language (any language with \"Optical character recognition\").\n\nOpen Settings now?",
+            "Snapr", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (answer == MessageBoxResult.Yes) Process.Start(new ProcessStartInfo("ms-settings:regionlanguage") { UseShellExecute = true });
     }
 }

@@ -30,4 +30,30 @@ public class OcrTests
 
         Assert.Contains("Snapr reads this text", text);
     }
+
+    [Fact]
+    public async Task Word_boxes_lie_on_the_drawn_words()
+    {
+        if (!OcrService.IsAvailable) return;   // machine without a Windows OCR language: manual check
+        BitmapSource image = null!;
+        Sta.Run(() =>
+        {
+            var v = new DrawingVisual();
+            using (var dc = v.RenderOpen())
+            {
+                dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, 800, 160));
+                dc.DrawText(new FormattedText("mail jane@example.com now", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"), 40, Brushes.Black, 1.0), new Point(40, 50));
+            }
+            image = ImageIo.Rasterize(v, 800, 160);
+        });
+
+        var lines = await OcrService.RecognizeLinesAsync(image);
+
+        var word = lines.SelectMany(l => l.Words).Single(w => w.Text.Contains('@'));
+        Assert.InRange(word.Bounds.X, 100, 400);
+        Assert.InRange(word.Bounds.Y, 40, 110);
+        Assert.InRange(word.Bounds.Bottom, 60, 130);
+        Assert.True(word.Bounds.Right <= 800);
+    }
 }

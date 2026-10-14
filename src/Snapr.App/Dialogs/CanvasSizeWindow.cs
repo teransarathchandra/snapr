@@ -10,9 +10,9 @@ public sealed class CanvasSizeWindow : Window
 {
     readonly int _w, _h;
     readonly TextBox _left = Box(), _top = Box(), _right = Box(), _bottom = Box();
-    readonly RadioButton _white = new() { Content = "White", IsChecked = true, GroupName = "margin" };
-    readonly RadioButton _transparent = new() { Content = "Transparent", GroupName = "margin", Margin = new Thickness(12, 0, 0, 0) };
-    readonly RadioButton _current = new() { Content = "Current colour", GroupName = "margin", Margin = new Thickness(12, 0, 0, 0) };
+    readonly RadioButton _white = Radio("White", isChecked: true);
+    readonly RadioButton _transparent = Radio("Transparent");
+    readonly RadioButton _current = Radio("Current colour");
     readonly TextBlock _error = new() { Foreground = Brushes.IndianRed, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap, MaxWidth = 320 };
     readonly Button _ok;
     readonly string _currentColor;
@@ -65,6 +65,12 @@ public sealed class CanvasSizeWindow : Window
     }
 
     static TextBox Box() => new() { Width = 90, Text = "0", Margin = new Thickness(0, 4, 0, 4) };
+
+    static RadioButton Radio(string text, bool isChecked = false) => new()
+    {
+        Content = text, IsChecked = isChecked, GroupName = "margin",
+        Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+    };
 
     static void AddRow(Grid grid, int row, string label, TextBox box)
     {
