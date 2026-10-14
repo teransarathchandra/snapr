@@ -20,7 +20,7 @@ public class ImageAnnotationTests
     {
         Assert.Equal(new Rct(15, 15, 20, 30), ((ImageAnnotation)AnnotationGeometry.Translate(Img, 5, 5)).Bounds);
         Assert.Equal(new Pt(30, 40), AnnotationGeometry.ResizeHandle(Img));
-        Assert.Equal(new Rct(10, 10, 40, 50), ((ImageAnnotation)AnnotationGeometry.ResizeTo(Img, new(50, 60))).Bounds);
+        Assert.Equal(new Rct(10, 10, 40, 60), ((ImageAnnotation)AnnotationGeometry.ResizeTo(Img, new(50, 60))).Bounds);   // aspect kept
     }
 
     [Fact]

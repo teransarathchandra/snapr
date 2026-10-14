@@ -19,6 +19,16 @@ public static class DocumentRenderer
     {
         dc.DrawImage(baseImage, new Rect(0, 0, baseImage.PixelWidth, baseImage.PixelHeight));
         foreach (var a in state.Annotations) DrawAnnotation(dc, baseImage, a);
+        PrunePictures(state);
+    }
+
+    // Evict only pictures of objects no longer in the document, and only once the cache has grown well past it.
+    static void PrunePictures(DocumentState state)
+    {
+        var live = state.Annotations.OfType<ImageAnnotation>().Select(i => i.Id).ToHashSet();
+        if (Pictures.Count <= live.Count + 64) return;
+        foreach (var key in Pictures.Keys)
+            if (!live.Contains(key.Item1)) Pictures.TryRemove(key, out _);
     }
 
     public static BitmapSource Render(BitmapSource baseImage, DocumentState state, bool applyEffects)
@@ -282,8 +292,8 @@ public static class DocumentRenderer
 
     static readonly Brush PlaceholderFill = ImageIo.Brush("#FFD4D4D8");
 
-    // Decoded pictures keyed by object ID and payload length; null = undecodable. A capture holds few image
-    // objects, so the cache is simply cleared when it grows.
+    // Decoded pictures keyed by object ID and payload length; null = undecodable. Entries of the drawn document are
+    // never evicted (see PrunePictures).
     static readonly ConcurrentDictionary<(Guid, int), BitmapSource?> Pictures = new();
 
     static void DrawImageObject(DrawingContext dc, ImageAnnotation x)
@@ -293,11 +303,15 @@ public static class DocumentRenderer
         else dc.DrawRectangle(PlaceholderFill, Pen("#FF71717A", 1), r);
     }
 
+    static int _decodes;
+    /// <summary>Diagnostic: number of picture decodes so far (lets tests prove the cache holds).</summary>
+    public static int PictureDecodes => _decodes;
+
     static BitmapSource? Picture(ImageAnnotation x)
     {
-        if (Pictures.Count > 64) Pictures.Clear();
         return Pictures.GetOrAdd((x.Id, x.Png.Length), _ =>
         {
+            Interlocked.Increment(ref _decodes);
             try
             {
                 var bytes = Convert.FromBase64String(x.Png);

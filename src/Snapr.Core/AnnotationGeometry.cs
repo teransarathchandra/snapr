@@ -87,6 +87,13 @@ public static class AnnotationGeometry
     static Pt BottomRight(Rct r) => new(r.Right, r.Bottom);
     static Rct Grow(Rct r, Pt p) => Rct.FromPoints(new Pt(r.X, r.Y), p);
 
+    /// <summary>Width from the cursor (at least 4 px); height follows so the picture keeps its shape.</summary>
+    static Rct KeepAspect(Rct r, Pt p)
+    {
+        var w = Math.Max(4, p.X - r.X);
+        return r with { W = w, H = r.W > 0 ? w * r.H / r.W : r.H };
+    }
+
     public static Annotation ResizeTo(Annotation a, Pt p) => a switch
     {
         ArrowAnnotation x => x with { End = p },
@@ -94,7 +101,7 @@ public static class AnnotationGeometry
         CalloutAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         HighlightAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         BlurAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
-        ImageAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
+        ImageAnnotation x => x with { Bounds = KeepAspect(x.Bounds, p) },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(2 * (p.X - x.TargetCenter.X) / Math.Max(1, x.SourceBounds.W), 1.5, 4) },
         _ => a,
     };
@@ -138,6 +145,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => fallback with { Color = ColorText.WithAlpha(x.Color, 0xFF), Shadow = false },
         PenAnnotation x => fallback with { Color = x.Color, Width = x.Width, Shadow = x.Shadow },
         ImageAnnotation x => fallback with { Shadow = x.Shadow },
+        MagnifyAnnotation x => fallback with { Shadow = x.Shadow },
         _ => fallback,
     };
 

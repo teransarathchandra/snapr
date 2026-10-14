@@ -18,25 +18,38 @@ public static class AnnotationClipboard
         RespectRequiredConstructorParameters = true,
     };
 
-    public static string Serialize(Annotation a) => JsonSerializer.Serialize(a, SnaprJson.Options);
+    public const int MaxObjects = 10_000;
 
-    /// <summary>Null for anything that is not a valid Snapr object (other apps can put any text under this name).</summary>
-    public static Annotation? Deserialize(string? json)
+    public static string Serialize(IReadOnlyList<Annotation> items) => JsonSerializer.Serialize(items.ToArray(), SnaprJson.Options);
+
+    /// <summary>
+    /// The objects in a payload: a JSON array, or a single object as written by earlier versions.
+    /// Null for anything that is not entirely valid (other apps can put any text under this name).
+    /// </summary>
+    public static IReadOnlyList<Annotation>? Deserialize(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<Annotation>(json, Strict); }
+        try
+        {
+            if (json.TrimStart().StartsWith('['))
+            {
+                var items = JsonSerializer.Deserialize<Annotation?[]>(json, Strict);
+                return items is { Length: > 0 and <= MaxObjects } && items.All(a => a is not null) ? items.Select(a => a!).ToArray() : null;
+            }
+            return JsonSerializer.Deserialize<Annotation>(json, Strict) is { } one ? new[] { one } : null;
+        }
         catch (Exception ex) when (ex is JsonException or NotSupportedException) { return null; }
     }
 
-    public static bool Set(Annotation a, BitmapSource image)
+    public static bool Set(IReadOnlyList<Annotation> items, BitmapSource image)
     {
         var data = new DataObject();
-        data.SetData(Format, Serialize(a));
+        data.SetData(Format, Serialize(items));
         data.SetImage(ImageIo.FlattenOnWhite(image));
         return ClipboardImage.Try(() => Clipboard.SetDataObject(data, true));
     }
 
-    public static Annotation? Get()
+    public static IReadOnlyList<Annotation>? Get()
     {
         string? json = null;
         try { ClipboardImage.Try(() => json = Clipboard.ContainsData(Format) ? Clipboard.GetData(Format) as string : null); }

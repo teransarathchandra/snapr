@@ -5,6 +5,13 @@ namespace Snapr.Tests;
 public class AnnotationGeometryTests
 {
     [Fact]
+    public void Magnify_keeps_its_shadow_through_style_changes()
+    {
+        var m = new MagnifyAnnotation(new(0, 0, 20, 20), new(100, 100), 2, MagnifyShape.Circle) { Shadow = true };
+        Assert.True(AnnotationGeometry.StyleOf(m, ToolStyle.Default with { Shadow = false }).Shadow);
+    }
+
+    [Fact]
     public void Arrow_hit_uses_distance_to_the_line()
     {
         var a = new ArrowAnnotation(new(0, 0), new(100, 0), "#FFFF0000", 4);

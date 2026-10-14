@@ -18,13 +18,19 @@ public sealed class EditorCanvas : Canvas
 {
     static readonly Brush Accent = ImageIo.Brush("#FF3B82F6");
     static readonly Brush CropDim = ImageIo.Brush("#99000000");
+    static readonly Brush BoxFill = ImageIo.Brush("#1A3B82F6");
 
     BitmapSource? _base;
     DocumentState _state = DocumentState.Empty;
     DocumentState? _preview;
     Pt _down;
-    Annotation? _dragOriginal;
-    bool _resizing;
+    IReadOnlyList<Guid> _selected = [];
+    bool _moved;                 // a Move drag has passed the system drag distance (otherwise it is still a click)
+    bool _dragging;            // moving the selection (or resizing _resizeOriginal)
+    Annotation? _resizeOriginal;
+    Rct? _box;                   // selection box being dragged
+    bool _additive;              // Shift held when the box started
+    Annotation? _clickHit;       // object under a plain mouse-down; a click without movement narrows the selection to it
     List<Pt>? _pen;
     Rct? _cropDrag;
     TextBox? _textEditor;
@@ -40,8 +46,11 @@ public sealed class EditorCanvas : Canvas
     public ToolOptions Options { get; set; } = ToolOptions.Default;
     public double Zoom { get; set; } = 1;
     public DocumentState State => _state;
-    public Guid? SelectedId { get; private set; }
-    public Annotation? Selected => SelectedId is { } id ? _state.Annotations.FirstOrDefault(a => a.Id == id) : null;
+    /// <summary>Selected object IDs, always including whole groups, in document order.</summary>
+    public IReadOnlyList<Guid> SelectedIds => _selected;
+    public IReadOnlyList<Annotation> SelectedObjects => _state.Annotations.Where(a => _selected.Contains(a.Id)).ToArray();
+    /// <summary>The selected object when exactly one is selected; null when none or several are.</summary>
+    public Annotation? Selected => _selected.Count == 1 ? _state.Annotations.FirstOrDefault(a => a.Id == _selected[0]) : null;
     public Rct View => _state.Crop ?? (_base is null ? default : new Rct(0, 0, _base.PixelWidth, _base.PixelHeight));
 
     public EditorCanvas()
@@ -55,7 +64,7 @@ public sealed class EditorCanvas : Canvas
     {
         CancelTextEditor();
         _base = baseImage;
-        SelectedId = null;
+        _selected = [];
         SetState(state);
         SelectionChanged?.Invoke();
     }
@@ -64,34 +73,48 @@ public sealed class EditorCanvas : Canvas
     {
         _state = state;
         _preview = null;
-        if (SelectedId is { } id && state.Annotations.All(a => a.Id != id))
+        var kept = state.ExpandToGroups(_selected);
+        if (!kept.SequenceEqual(_selected))
         {
-            SelectedId = null;
+            _selected = kept;
             SelectionChanged?.Invoke();
         }
         InvalidateMeasure();
         InvalidateVisual();
     }
 
-    public void Select(Annotation? a)
+    public void Select(Annotation? a) => SelectIds(a is null ? Array.Empty<Guid>() : new[] { a.Id });
+
+    /// <summary>Selects these objects and every member of their groups.</summary>
+    public void SelectIds(IEnumerable<Guid> ids)
     {
-        SelectedId = a?.Id;
+        _selected = _state.ExpandToGroups(ids);
         SelectionChanged?.Invoke();
         InvalidateVisual();
     }
 
+    public void SelectAll() => SelectIds(_state.HitInBox(View));
+
     public void Apply(Func<DocumentState, DocumentState> edit, string? mergeKey = null) => Commit(edit(_state), mergeKey);
 
+    /// <summary>Applies the edit to every selected object as one undo step.</summary>
     public void ApplyToSelection(Func<Annotation, Annotation> edit, string? mergeKey = null)
     {
-        if (Selected is { } s) Commit(_state.Replace(edit(s)), mergeKey);
+        if (_selected.Count == 0) return;
+        Commit(_state with { Annotations = _state.Annotations.Select(a => _selected.Contains(a.Id) ? edit(a) : a).ToArray() }, mergeKey);
     }
 
     public void DeleteSelected()
     {
-        if (SelectedId is not { } id) return;
-        Commit(_state.Remove(id));
+        if (_selected.Count == 0) return;
+        Commit(_state.RemoveMany(_selected));
         Select(null);
+    }
+
+    /// <summary>Moves the selection; repeated nudges merge into one undo step.</summary>
+    public void Nudge(double dx, double dy)
+    {
+        if (_selected.Count > 0) Commit(_state.TranslateMany(_selected, dx, dy), "nudge");
     }
 
     void Commit(DocumentState next, string? mergeKey = null)
@@ -121,7 +144,8 @@ public sealed class EditorCanvas : Canvas
         var state = _preview ?? _state;
         DocumentRenderer.DrawScene(dc, _base, state);
         if (_cropDrag is { } c) DrawCropPreview(dc, c);
-        if (SelectedId is { } id && state.Annotations.FirstOrDefault(a => a.Id == id) is { } selected) DrawSelection(dc, selected);
+        if (_box is { } box) dc.DrawRectangle(BoxFill, new Pen(Accent, 1 / Zoom) { DashStyle = DashStyles.Dash }, ToRect(box));
+        DrawSelection(dc, state);
         dc.Pop();
         dc.Pop();
     }
@@ -137,16 +161,31 @@ public sealed class EditorCanvas : Canvas
 
     double HandleSize => 10 / Zoom;
 
-    void DrawSelection(DrawingContext dc, Annotation a)
+    void DrawSelection(DrawingContext dc, DocumentState state)
     {
-        var b = AnnotationGeometry.Bounds(a).Inflate(4 / Zoom);
-        dc.DrawRectangle(null, new Pen(Accent, 1.5 / Zoom) { DashStyle = DashStyles.Dash }, new Rect(b.X, b.Y, Math.Max(0, b.W), Math.Max(0, b.H)));
-        if (AnnotationGeometry.ResizeHandle(a) is { } h)
+        var selected = state.Annotations.Where(a => _selected.Contains(a.Id)).ToArray();
+        if (selected.Length == 0) return;
+        var dashed = new Pen(Accent, 1.5 / Zoom) { DashStyle = DashStyles.Dash };
+        var all = default(Rct);
+        foreach (var a in selected)
+        {
+            var b = AnnotationGeometry.Bounds(a).Inflate(4 / Zoom);
+            all = all.Union(b);
+            dc.DrawRectangle(null, dashed, ToRect(b));
+        }
+        if (selected.Length > 1) dc.DrawRectangle(null, new Pen(Accent, 1 / Zoom), ToRect(all.Inflate(4 / Zoom)));
+        if (ResizeTarget(state) is { } r && AnnotationGeometry.ResizeHandle(r) is { } h)
             dc.DrawRectangle(Brushes.White, new Pen(Accent, 1.5 / Zoom), new Rect(h.X - HandleSize / 2, h.Y - HandleSize / 2, HandleSize, HandleSize));
     }
 
+    static Rect ToRect(Rct r) => new(r.X, r.Y, Math.Max(0, r.W), Math.Max(0, r.H));
+
+    /// <summary>The object whose resize handle is shown: only when the selection is exactly one ungrouped object.</summary>
+    Annotation? ResizeTarget(DocumentState state) =>
+        _selected.Count == 1 && state.Annotations.FirstOrDefault(a => a.Id == _selected[0]) is { GroupId: null } a ? a : null;
+
     bool OnHandle(Pt p) =>
-        Selected is { } s && AnnotationGeometry.ResizeHandle(s) is { } h &&
+        ResizeTarget(_state) is { } s && AnnotationGeometry.ResizeHandle(s) is { } h &&
         Math.Abs(p.X - h.X) <= HandleSize && Math.Abs(p.Y - h.Y) <= HandleSize;
 
     Pt ToImage(MouseEventArgs e)
@@ -174,16 +213,31 @@ public sealed class EditorCanvas : Canvas
         switch (Tool)
         {
             case ToolKind.Move:
-                var hit = OnHandle(p) ? Selected : _state.HitTest(p, 6 / Zoom);
+                var onHandle = OnHandle(p);
+                var hit = onHandle ? ResizeTarget(_state) : _state.HitTest(p, 6 / Zoom);
                 if (e.ClickCount == 2 && hit is TextAnnotation or CalloutAnnotation)
                 {
                     Select(hit);
                     BeginTextEdit(hit, isNew: false);
                     return;
                 }
-                _resizing = hit is not null && OnHandle(p);
-                Select(hit);
-                _dragOriginal = hit;
+                var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                if (hit is null)
+                {
+                    if (!shift) Select(null);
+                    _additive = shift;
+                    _box = new Rct(p.X, p.Y, 0, 0);
+                    break;
+                }
+                if (shift)
+                {
+                    SelectIds(_state.Toggle(_selected, hit.Id));
+                    return;
+                }
+                if (!_selected.Contains(hit.Id)) Select(hit);
+                _resizeOriginal = onHandle ? hit : null;
+                _clickHit = onHandle ? null : hit;
+                _dragging = true;
                 break;
             case ToolKind.Text:
                 BeginTextEdit(AnnotationFactory.Text(p, CurrentStyle), isNew: true);
@@ -203,10 +257,19 @@ public sealed class EditorCanvas : Canvas
         if (!IsMouseCaptured) return;
         switch (Tool)
         {
-            case ToolKind.Move when _dragOriginal is not null:
-                _preview = _state.Replace(_resizing
-                    ? AnnotationGeometry.ResizeTo(_dragOriginal, p)
-                    : AnnotationGeometry.Translate(_dragOriginal, p.X - _down.X, p.Y - _down.Y));
+            case ToolKind.Move when _box is not null:
+                _box = Rct.FromPoints(_down, p);
+                break;
+            case ToolKind.Move when _dragging:
+                if (_resizeOriginal is null && !_moved)
+                {
+                    if (Math.Abs(p.X - _down.X) < SystemParameters.MinimumHorizontalDragDistance / Zoom
+                        && Math.Abs(p.Y - _down.Y) < SystemParameters.MinimumVerticalDragDistance / Zoom) break;   // still a click
+                    _moved = true;
+                }
+                _preview =_resizeOriginal is { } r
+                    ? _state.Replace(AnnotationGeometry.ResizeTo(r, p))
+                    : _state.TranslateMany(_selected, p.X - _down.X, p.Y - _down.Y);
                 break;
             case ToolKind.Pen when _pen is not null:
                 _pen.Add(p);
@@ -230,8 +293,17 @@ public sealed class EditorCanvas : Canvas
         var p = ToImage(e);
         switch (Tool)
         {
+            case ToolKind.Move when _box is { } box:
+                var visible = box.Intersect(View);
+                if (!visible.IsEmpty && (box.W * Zoom >= 3 || box.H * Zoom >= 3))   // smaller than 3 × 3 screen px = a click on empty space
+                {
+                    var hits = _state.HitInBox(visible);
+                    SelectIds(_additive ? _selected.Concat(hits) : hits);
+                }
+                break;
             case ToolKind.Move:
                 if (_preview is not null) Commit(_preview);
+                else if (_clickHit is not null && !_moved) Select(_clickHit);
                 break;
             case ToolKind.Pen:
                 if (_pen is { Count: > 1 }) Commit(_state.Add(AnnotationFactory.Pen(_pen.ToArray(), CurrentStyle)));
@@ -267,10 +339,14 @@ public sealed class EditorCanvas : Canvas
     void ResetDrag()
     {
         _preview = _textEditor is null ? null : _preview;
-        _dragOriginal = null;
+        _dragging = false;
+        _moved = false;
+        _resizeOriginal = null;
+        _clickHit = null;
+        _box = null;
+        _additive = false;
         _pen = null;
         _cropDrag = null;
-        _resizing = false;
         InvalidateVisual();
     }
 

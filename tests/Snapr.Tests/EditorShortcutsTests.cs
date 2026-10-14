@@ -31,13 +31,34 @@ public class EditorShortcutsTests
     [InlineData(C, Key.Subtract, EditorCommand.ZoomOut)]
     [InlineData(C, Key.D0, EditorCommand.ZoomFit)]
     [InlineData(C, Key.NumPad0, EditorCommand.ZoomFit)]
+    [InlineData(C, Key.A, EditorCommand.SelectAll)]
+    [InlineData(C | S, Key.G, EditorCommand.Group)]
+    [InlineData(C | S, Key.U, EditorCommand.Ungroup)]
     public void Maps_every_spec_shortcut(ModifierKeys modifiers, Key key, EditorCommand command) =>
         Assert.Equal(command, EditorShortcuts.Resolve(modifiers, key));
 
     [Theory]
     [InlineData(C | S, Key.Z)]
     [InlineData(N, Key.S)]
-    [InlineData(C, Key.A)]
+    [InlineData(C, Key.G)]
     public void Unlisted_keys_map_to_nothing(ModifierKeys modifiers, Key key) =>
         Assert.Null(EditorShortcuts.Resolve(modifiers, key));
+
+    [Theory]
+    [InlineData(N, Key.Left, -1, 0)]
+    [InlineData(N, Key.Right, 1, 0)]
+    [InlineData(N, Key.Up, 0, -1)]
+    [InlineData(N, Key.Down, 0, 1)]
+    [InlineData(S, Key.Left, -10, 0)]
+    [InlineData(S, Key.Down, 0, 10)]
+    public void Arrow_keys_nudge(ModifierKeys modifiers, Key key, int dx, int dy) =>
+        Assert.Equal((dx, dy), EditorShortcuts.Nudge(modifiers, key));
+
+    [Theory]
+    [InlineData(C, Key.Left)]
+    [InlineData(A, Key.Up)]
+    [InlineData(C | S, Key.Right)]
+    [InlineData(N, Key.A)]
+    public void Other_arrow_combinations_do_not_nudge(ModifierKeys modifiers, Key key) =>
+        Assert.Null(EditorShortcuts.Nudge(modifiers, key));
 }

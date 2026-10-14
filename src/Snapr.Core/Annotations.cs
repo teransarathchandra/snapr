@@ -22,6 +22,9 @@ public abstract record Annotation
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public bool Shadow { get; init; }
+    /// <summary>Objects with the same non-null GroupId select, move and copy as one. Null = not grouped (and omitted from JSON).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? GroupId { get; init; }
 }
 
 public sealed record ArrowAnnotation(Pt Start, Pt End, string Color, double Width,

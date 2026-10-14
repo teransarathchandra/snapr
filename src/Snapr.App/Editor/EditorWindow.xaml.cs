@@ -200,8 +200,11 @@ public partial class EditorWindow : Window
         if (_doc is null) return false;
         Board.CommitTextEditor();
         bool ok;
-        if (!wholeImage && Board.Selected is { } s)
-            ok = AnnotationClipboard.Set(s, RenderArea(AnnotationGeometry.Bounds(s)));
+        if (!wholeImage && Board.SelectedObjects is { Count: > 0 } items)
+        {
+            var area = items.Select(AnnotationGeometry.Bounds).Aggregate((a, b) => a.Union(b)).Intersect(Board.View);
+            ok = AnnotationClipboard.Set(items, RenderArea(area.IsEmpty ? Board.View : area));
+        }
         else if ((ok = ClipboardImage.Set(RenderForExport())))
             _app.Notify("Copied", "The image is on the clipboard.");
         if (ok) _pasteCount = 0;
@@ -211,22 +214,62 @@ public partial class EditorWindow : Window
 
     void Cut()
     {
-        if (Board.Selected is null) return;
+        if (Board.SelectedIds.Count == 0) return;
         if (Copy()) Board.DeleteSelected();
     }
 
     void Paste()
     {
-        if (_doc is not null && AnnotationClipboard.Get() is { } source)
+        if (_doc is not null && AnnotationClipboard.Get() is { } sources)
         {
             Board.CommitTextEditor();
-            var (next, pasted) = Board.State.PasteCopy(source, 16 * ++_pasteCount);
+            var (next, pasted) = Board.State.PasteCopies(sources, 16 * ++_pasteCount);
             Board.Apply(_ => next);
             SetTool(ToolKind.Move);
-            Board.Select(next.Annotations.First(a => a.Id == pasted.Id));
+            Board.SelectIds(pasted);
             return;
         }
-        _app.OpenFromClipboard();
+        if (_doc is null) _app.OpenFromClipboard();   // no capture open: nothing to paste into, open it as a new capture
+        else PasteImage();
+    }
+
+    void PasteImage()
+    {
+        BitmapSource? image = null;
+        ClipboardImage.Try(() => image = Clipboard.ContainsImage() ? Clipboard.GetImage() : null);
+        if (image is null)
+        {
+            _app.Notify("Nothing to paste", "The clipboard has no image or Snapr object.");
+            return;
+        }
+        BitmapSource picture = image;
+        AddImageObjects([("the clipboard image", () => picture)], Board.View.Center);
+    }
+
+    /// <summary>Adds pictures as Image objects (each next one +16, +16 px) as one undo step and selects them.</summary>
+    void AddImageObjects(IEnumerable<(string Name, Func<BitmapSource> Load)> sources, Pt at)
+    {
+        Board.CommitTextEditor();
+        var state = Board.State;
+        var added = new List<Guid>();
+        foreach (var (name, load) in sources)
+        {
+            try
+            {
+                var a = ImageObjects.Create(load(), at.Offset(16 * added.Count, 16 * added.Count), Board.View);
+                state = state.Add(a);
+                added.Add(a.Id);
+            }
+            catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
+            {
+                Log.Write($"Could not add image {name}", ex);
+                MessageBox.Show(this, $"Snapr couldn't add that image: {ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        if (added.Count == 0) return;
+        Board.Apply(_ => state);
+        SetTool(ToolKind.Move);
+        Board.SelectIds(added);
     }
 
     /// <summary>The document (no effects) rendered and cut to an area, for copying one object to other apps.</summary>
@@ -485,9 +528,24 @@ public partial class EditorWindow : Window
         e.Handled = true;
     }
 
+    /// <summary>Image files become Image objects in the open capture at the drop point; other files (.snapr, .snagx…) open as before.</summary>
     void Window_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files) _app.OpenImageFile(files[0]);
+        if (e.Data.GetData(DataFormats.FileDrop) is not string[] { Length: > 0 } files) return;
+        if (_doc is null)
+        {
+            _app.OpenImageFile(files[0]);
+            return;
+        }
+        var images = files.Where(ImageObjects.IsImageFile).ToArray();
+        if (images.Length > 0)
+        {
+            var p = e.GetPosition(Board);
+            var v = Board.View;
+            var at = new Pt(Math.Clamp(p.X + v.X, v.X, v.Right), Math.Clamp(p.Y + v.Y, v.Y, v.Bottom));
+            AddImageObjects(images.Select(f => (Path.GetFileName(f), (Func<BitmapSource>)(() => ImageObjects.Load(f)))), at);
+        }
+        if (files.FirstOrDefault(f => !ImageObjects.IsImageFile(f)) is { } other) _app.OpenImageFile(other);
     }
 
     // ---------- Keyboard and lifetime ----------
@@ -496,7 +554,10 @@ public partial class EditorWindow : Window
     {
         if (Keyboard.FocusedElement is TextBox) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
-        if (EditorShortcuts.Resolve(Keyboard.Modifiers, key) is { } command) Run(command);
+        // Arrow keys nudge only when the canvas has focus and something is selected; otherwise the scroll view and panel controls keep them.
+        if (ReferenceEquals(Keyboard.FocusedElement, Board) && Board.SelectedIds.Count > 0 && EditorShortcuts.Nudge(Keyboard.Modifiers, key) is { } n)
+            Board.Nudge(n.Dx, n.Dy);
+        else if (EditorShortcuts.Resolve(Keyboard.Modifiers, key) is { } command) Run(command);
         else if (Keyboard.Modifiers == ModifierKeys.None && Array.FindIndex(Tools, t => t.Key == key) is var i and >= 0) SetTool(Tools[i].Tool);
         else return;
         e.Handled = true;
@@ -526,7 +587,34 @@ public partial class EditorWindow : Window
             case EditorCommand.ZoomIn: ZoomBy(+1); break;
             case EditorCommand.ZoomOut: ZoomBy(-1); break;
             case EditorCommand.ZoomFit: _manualZoom = null; ApplyZoom(); break;
+            case EditorCommand.SelectAll:
+                if (_doc is null) break;
+                Board.CommitTextEditor();
+                SetTool(ToolKind.Move);
+                Board.SelectAll();
+                Board.Focus();
+                break;
+            case EditorCommand.Group: Group(); break;
+            case EditorCommand.Ungroup: Ungroup(); break;
         }
+    }
+
+    static bool IsOneGroup(IReadOnlyList<Annotation> items) =>
+        items.Count > 0 && items[0].GroupId is { } g && items.All(a => a.GroupId == g);
+
+    void Group()
+    {
+        var items = Board.SelectedObjects;
+        if (items.Count < 2 || IsOneGroup(items)) return;
+        Board.Apply(s => s.Group(Board.SelectedIds));
+        BuildProps();
+    }
+
+    void Ungroup()
+    {
+        if (!Board.SelectedObjects.Any(a => a.GroupId is not null)) return;
+        Board.Apply(s => s.Ungroup(Board.SelectedIds));
+        BuildProps();
     }
 
     protected override void OnClosing(CancelEventArgs e)

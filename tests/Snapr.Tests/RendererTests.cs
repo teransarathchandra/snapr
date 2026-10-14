@@ -157,7 +157,18 @@ public class RendererTests
     });
 
     [Fact]
-    public void Broken_image_object_draws_a_placeholder() => Sta.Run(() =>
+    public void Many_image_objects_are_decoded_once_across_renders() => Sta.Run(() =>
+    {
+        var png = Convert.ToBase64String(ImageIo.EncodePng(Solid(2, 2, 0xFFFF0000)));
+        var state = With(Enumerable.Range(0, 70).Select(i => (Annotation)new ImageAnnotation(new(i, 0, 1, 1), png)).ToArray());
+        DocumentRenderer.Render(Solid(80, 10, 0xFFFFFFFF), state, false);
+        var before = DocumentRenderer.PictureDecodes;
+        DocumentRenderer.Render(Solid(80, 10, 0xFFFFFFFF), state, false);
+        Assert.Equal(before, DocumentRenderer.PictureDecodes);
+    });
+
+    [Fact]
+    public void Broken_image_object_draws_a_placeholder()=> Sta.Run(() =>
     {
         var img = DocumentRenderer.Render(Solid(50, 50, 0xFFFFFFFF), With(new ImageAnnotation(new(10, 10, 20, 20), "not base64!")), false);
         Assert.Equal(0xFFD4D4D8u, Px(img, 20, 20));

@@ -63,6 +63,12 @@ public partial class EditorWindow
     void BuildProps()
     {
         PropsPanel.Children.Clear();
+        if (Board.SelectedObjects is { Count: > 1 } many)
+        {
+            MultiProps(many);
+            EffectsProps();
+            return;
+        }
         var selected = Board.Selected;
         var kind = selected is null ? Board.Tool : KindOf(selected);
         var style = selected is null ? Board.CurrentStyle : AnnotationGeometry.StyleOf(selected, Board.CurrentStyle);
@@ -112,6 +118,7 @@ public partial class EditorWindow
             Hint("Drag over the image to crop. Pixels outside are kept, so you can reset.");
             ButtonRow(("Reset crop", () => Board.Apply(s => s.ResetCrop())));
         }
+        if (selected is { GroupId: not null }) ButtonRow(("Ungroup", Ungroup));
         if (selected is not null)
             ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(selected.Id))),
                       ("Send to back", () => Board.Apply(s => s.SendToBack(selected.Id))),
@@ -119,6 +126,11 @@ public partial class EditorWindow
         else if (kind is not (ToolKind.Move or ToolKind.Crop or ToolKind.Eraser))
             ButtonRow(("Save as quick style", () => { _app.SaveQuickStyle(Board.Tool, Board.CurrentStyle); _app.Notify("Quick style saved", $"{name} will start with this style."); }));
 
+        EffectsProps();
+    }
+
+    void EffectsProps()
+    {
         Header("Effects");
         var fx = Board.State.Effects;
         CheckRow("Border", fx.Border is not null, v => Board.Apply(s => s.SetEffects(s.Effects with { Border = v ? new BorderEffect(Board.CurrentStyle.Color, 6) : null })));
@@ -127,9 +139,41 @@ public partial class EditorWindow
         Hint("Effects are added when you copy, save or export.");
     }
 
+    /// <summary>Panel for 2+ selected objects: colour and shadow for all, align/distribute, group, arrange, delete.</summary>
+    void MultiProps(IReadOnlyList<Annotation> many)
+    {
+        var units = Board.State.UnitCount(Board.SelectedIds);
+        Header($"{many.Count} objects");
+        Label("Colour");
+        SwatchRow(AnnotationGeometry.StyleOf(many[0], Board.CurrentStyle).Color, c => ChangeStyle(s => s with { Color = c }));
+        var shadowable = many.Where(a => a is not (BlurAnnotation or HighlightAnnotation)).ToArray();
+        if (shadowable.Length > 0) CheckRow("Shadow", shadowable.All(a => a.Shadow), v => ChangeStyle(s => s with { Shadow = v }));
+        if (units >= 2)
+        {
+            Label("Align");
+            ButtonRow(("Left", () => Align(AlignEdge.Left)), ("Centre", () => Align(AlignEdge.Center)), ("Right", () => Align(AlignEdge.Right)));
+            ButtonRow(("Top", () => Align(AlignEdge.Top)), ("Middle", () => Align(AlignEdge.Middle)), ("Bottom", () => Align(AlignEdge.Bottom)));
+        }
+        if (units >= 3)
+        {
+            Label("Distribute");
+            ButtonRow(("Horizontally", () => Board.Apply(s => s.Distribute(Board.SelectedIds, Axis.Horizontal))),
+                      ("Vertically", () => Board.Apply(s => s.Distribute(Board.SelectedIds, Axis.Vertical))));
+        }
+        var grouping = new List<(string Text, Action Click)>();
+        if (!IsOneGroup(many)) grouping.Add(("Group", Group));
+        if (many.Any(a => a.GroupId is not null)) grouping.Add(("Ungroup", Ungroup));
+        if (grouping.Count > 0) ButtonRow([.. grouping]);
+        ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(Board.SelectedIds))),
+                  ("Send to back", () => Board.Apply(s => s.SendToBack(Board.SelectedIds))),
+                  ("Delete", Board.DeleteSelected));
+    }
+
+    void Align(AlignEdge edge) => Board.Apply(s => s.Align(Board.SelectedIds, edge));
+
     void ChangeStyle(Func<ToolStyle, ToolStyle> change, string? mergeKey = null)
     {
-        if (Board.Selected is not null)
+        if (Board.SelectedIds.Count > 0)
             Board.ApplyToSelection(a => AnnotationGeometry.WithStyle(a, change(AnnotationGeometry.StyleOf(a, Board.CurrentStyle))), mergeKey);
         else
             Board.CurrentStyle = change(Board.CurrentStyle);
@@ -138,7 +182,7 @@ public partial class EditorWindow
 
     void ChangeOptions(Func<ToolOptions, ToolOptions> change, string? mergeKey = null)
     {
-        if (Board.Selected is not null)
+        if (Board.SelectedIds.Count > 0)
             Board.ApplyToSelection(a => AnnotationGeometry.WithOptions(a, change(AnnotationGeometry.OptionsOf(a, Board.Options))), mergeKey);
         else
             Board.Options = change(Board.Options);
@@ -169,7 +213,7 @@ public partial class EditorWindow
                 ToolTip = c,
             };
             AutomationProperties.SetName(swatch, $"Colour {c}");
-            swatch.Click += (_, _) => pick(c);
+            swatch.Click += (_, _) => { pick(c); Board.Focus(); };
             row.Children.Add(swatch);
         }
         PropsPanel.Children.Add(row);
@@ -241,8 +285,8 @@ public partial class EditorWindow
     {
         var box = new CheckBox { Content = label, IsChecked = value };
         // Checked/Unchecked (not Click) so keyboard, mouse and UI Automation toggles all apply.
-        box.Checked += (_, _) => changed(true);
-        box.Unchecked += (_, _) => changed(false);
+        box.Checked += (_, _) => { changed(true); Board.Focus(); };
+        box.Unchecked += (_, _) => { changed(false); Board.Focus(); };
         PropsPanel.Children.Add(box);
     }
 
@@ -252,7 +296,7 @@ public partial class EditorWindow
         foreach (var (text, click) in buttons)
         {
             var b = new Button { Content = text, Margin = new Thickness(0, 0, 6, 6) };
-            b.Click += (_, _) => click();
+            b.Click += (_, _) => { click(); Board.Focus(); };
             row.Children.Add(b);
         }
         PropsPanel.Children.Add(row);

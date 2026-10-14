@@ -7,6 +7,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 
 - **Capture** a region, a window or every screen, with a magnifier, size readout and optional delay.
 - **Annotate** with arrows, text, callouts, shapes, pen, highlighter, numbered steps, blur or pixelate, magnifier, crop and eraser. Every object stays editable; undo goes back 100 steps.
+- **Work with several objects**: select with a box, Shift+click or Ctrl+A; move, nudge with the arrow keys, copy, delete, group (Ctrl+Shift+G), align and distribute them. Paste (Ctrl+V) or drop pictures onto a capture to add them as movable images.
 - **Effects**: border, drop shadow and torn edge.
 - **Grab Text** (OCR) from any part of the screen, using the OCR engine built into Windows.
 - **Scrolling capture** of long pages.
