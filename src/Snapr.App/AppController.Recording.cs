@@ -74,6 +74,8 @@ public sealed partial class AppController
         else TogglePause();
     }
 
+    public void RefreshRecents() => _editor?.RefreshRecents();
+
     /// <param name="failure">ffmpeg's last output if it stopped on its own; null for a normal stop.</param>
     async Task StopRecordingAsync(string? failure)
     {
@@ -94,7 +96,7 @@ public sealed partial class AppController
                 return;
             }
             Notify("Video saved", Path.GetFileName(path));
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            ShowVideoEditor(path);
         }
         catch (RecorderException ex)
         {

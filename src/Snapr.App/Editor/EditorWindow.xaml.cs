@@ -600,7 +600,7 @@ public partial class EditorWindow : Window
     {
         if (item.IsVideo)
         {
-            Process.Start(new ProcessStartInfo(item.Path) { UseShellExecute = true });
+            _app.ShowVideoEditor(item.Path);
             return;
         }
         if (string.Equals(item.Path, _path, StringComparison.OrdinalIgnoreCase)) return;
