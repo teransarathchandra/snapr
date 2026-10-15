@@ -21,6 +21,7 @@ public sealed partial class AppController : IDisposable
         _settings = SettingsStore.Load(SettingsStore.DefaultPath);
         _tray = new TrayService(this);
         RegisterHotkeys();
+        _tray.SetPresets(_settings.Presets);
     }
 
     public AppSettings Settings => _settings;
@@ -43,6 +44,7 @@ public sealed partial class AppController : IDisposable
         _settings = settings;
         TrySaveSettings();
         RegisterHotkeys();
+        _tray.SetPresets(_settings.Presets);
     }
 
     public void SaveLastTool(ToolKind tool)
@@ -81,6 +83,7 @@ public sealed partial class AppController : IDisposable
         Register(_settings.Hotkeys.ScrollingCapture, ScrollingCaptureAsync);
         Register(_settings.Hotkeys.RepeatLastCapture, RepeatLastCaptureAsync);
         Register(_settings.Hotkeys.VideoPauseResume, PauseResumeRecordingAsync);
+        foreach (var preset in _settings.Presets) Register(preset.Hotkey, () => RunPresetAsync(preset));
         if (failed.Count > 0)
             Notify("Hotkey unavailable", $"{string.Join(", ", failed)} is already used by another app. Change it in Settings. The tray menu still works.");
     }

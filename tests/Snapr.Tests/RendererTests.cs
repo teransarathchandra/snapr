@@ -168,6 +168,20 @@ public class RendererTests
     });
 
     [Fact]
+    public void Stamp_drag_previews_sharing_one_Id_decode_the_picture_once() => Sta.Run(() =>
+    {
+        var png = Convert.ToBase64String(ImageIo.EncodePng(Solid(3, 5, 0xFF00FF00)));
+        var choice = new Snapr.App.Editor.StampChoice(null, png, 3, 5);
+        var id = Guid.NewGuid();
+        var style = ToolStyle.Default;
+        DocumentRenderer.Render(Solid(80, 80, 0xFFFFFFFF), With(choice.Create(new(0, 0, 10, 10), style, id)), false);
+        var before = DocumentRenderer.PictureDecodes;
+        for (var i = 1; i <= 5; i++)
+            DocumentRenderer.Render(Solid(80, 80, 0xFFFFFFFF), With(choice.Create(new(0, 0, 10 + i, 10 + i), style, id)), false);
+        Assert.Equal(before, DocumentRenderer.PictureDecodes);
+    });
+
+    [Fact]
     public void Broken_image_object_draws_a_placeholder()=> Sta.Run(() =>
     {
         var img = DocumentRenderer.Render(Solid(50, 50, 0xFFFFFFFF), With(new ImageAnnotation(new(10, 10, 20, 20), "not base64!")), false);

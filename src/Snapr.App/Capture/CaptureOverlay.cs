@@ -68,7 +68,7 @@ sealed class CaptureOverlay : Window
             Background = Chip, CornerRadius = new CornerRadius(8), Padding = new Thickness(14, 8, 14, 8),
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 32),
             IsHitTestVisible = false,
-            Child = new TextBlock { Text = HintText(session.Mode), Foreground = Brushes.White, FontSize = 13 },
+            Child = new TextBlock { Text = HintText(session.Mode, session.Label is null), Foreground = Brushes.White, FontSize = 13 },
         };
 
         _layer.Children.Add(_dim);
@@ -92,11 +92,11 @@ sealed class CaptureOverlay : Window
         MouseEnter += (_, _) => Activate();
     }
 
-    static string HintText(OverlayMode mode) => mode switch
+    static string HintText(OverlayMode mode, bool copyAndText) => mode switch
     {
         OverlayMode.Video => "Drag the area to record  ·  Click a window  ·  Space: this screen  ·  Esc: cancel",
         OverlayMode.ScrollingWindow => "Click the window to scroll-capture  ·  Esc: cancel  (press Esc during capture to stop early)",
-        _ => "Drag to select  ·  Click a window  ·  Space: all screens  ·  C: copy only  ·  T: grab text  ·  Esc: cancel",
+        _ => "Drag to select  ·  Click a window  ·  Space: all screens  ·  " + (copyAndText ? "C: copy only  ·  T: grab text  ·  " : "") + "Esc: cancel",
     };
 
     Rct ClipArea => _session.Mode == OverlayMode.Video ? Monitor : _session.Virtual;
@@ -150,7 +150,7 @@ sealed class CaptureOverlay : Window
     {
         OverlayMode.Video => "  ·  Record",
         OverlayMode.ScrollingWindow => "  ·  Scrolling capture",
-        _ => _session.Action switch { OverlayAction.Copy => "  ·  Copy only", OverlayAction.GrabText => "  ·  Grab text", _ => "" },
+        _ => _session.Label is { } label ? $"  ·  {label}" : _session.Action switch { OverlayAction.Copy => "  ·  Copy only", OverlayAction.GrabText => "  ·  Grab text", _ => "" },
     };
 
     void Update(Pt p)

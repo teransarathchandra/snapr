@@ -77,6 +77,7 @@ public static class DocumentRenderer
             case BlurAnnotation x: DrawBlur(dc, src, x); break;
             case MagnifyAnnotation x: DrawMagnify(dc, src, x); break;
             case ImageAnnotation x: DrawImageObject(dc, x); break;
+            case StampAnnotation x: DrawStamp(dc, x); break;
         }
     }
 
@@ -295,6 +296,62 @@ public static class DocumentRenderer
     // Decoded pictures keyed by object ID and payload length; null = undecodable. Entries of the drawn document are
     // never evicted (see PrunePictures).
     static readonly ConcurrentDictionary<(Guid, int), BitmapSource?> Pictures = new();
+
+    // Parsed built-in drawings, by stamp Id (the catalogue never changes while Snapr runs).
+    static readonly ConcurrentDictionary<string, Geometry> StampGeometry = new();
+
+    static void DrawStamp(DrawingContext dc, StampAnnotation x)
+    {
+        var r = R(x.Bounds);
+        if (StampCatalog.Find(x.StampId) is not { } def)
+        {
+            dc.DrawRectangle(PlaceholderFill, Pen("#FF71717A", 1), r);   // a stamp from a newer Snapr
+            return;
+        }
+        var brush = ImageIo.Brush(x.Color);
+        if (def.Shape == StampShape.Path)
+        {
+            var geometry = StampGeometry.GetOrAdd(def.Id, _ => { var g = Geometry.Parse(def.Data); g.Freeze(); return g; });
+            var side = Math.Min(r.Width, r.Height);
+            dc.PushTransform(new TranslateTransform(r.X + (r.Width - side) / 2, r.Y + (r.Height - side) / 2));
+            dc.PushTransform(new ScaleTransform(side / 100, side / 100));
+            dc.DrawGeometry(brush, null, geometry);
+            dc.Pop();
+            dc.Pop();
+            return;
+        }
+        // Badge: one character on a circle, words on a pill; white bold text sized to fit.
+        if (def.Data.Length == 1)
+        {
+            var d = Math.Min(r.Width, r.Height);
+            r = new Rect(r.X + (r.Width - d) / 2, r.Y + (r.Height - d) / 2, d, d);
+        }
+        dc.DrawRoundedRectangle(brush, null, r, r.Height / 2, r.Height / 2);
+        var text = new FormattedText(def.Data, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal),
+            Math.Max(1, r.Height * 0.55), Brushes.White, 1.0);
+        var room = Math.Max(1, r.Width - r.Height * 0.5);
+        if (text.Width > room) text.SetFontSize(Math.Max(1, r.Height * 0.55 * room / text.Width));
+        dc.DrawText(text, new Point(r.X + (r.Width - text.Width) / 2, r.Y + (r.Height - text.Height) / 2));
+    }
+
+    /// <summary>A small picture of a built-in stamp for the Stamp panel.</summary>
+    public static ImageSource StampPreview(string stampId, string color, double size)
+    {
+        var def = StampCatalog.Find(stampId);
+        var aspect = def is null ? 1 : StampCatalog.Aspect(def);
+        var box = StampPlacement.Centered(new Pt(size / 2, size / 2), aspect);
+        var scale = size / StampPlacement.ClickSize;
+        var group = new DrawingGroup();
+        using (var dc = group.Open())
+        {
+            dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, size, size));   // keeps the image size fixed
+            DrawStamp(dc, new StampAnnotation(new Rct(size / 2 - box.W * scale / 2, size / 2 - box.H * scale / 2, box.W * scale, box.H * scale), stampId, color));
+        }
+        var image = new DrawingImage(group);
+        image.Freeze();
+        return image;
+    }
 
     static void DrawImageObject(DrawingContext dc, ImageAnnotation x)
     {

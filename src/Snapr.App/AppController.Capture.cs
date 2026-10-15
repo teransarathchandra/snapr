@@ -16,7 +16,8 @@ public sealed partial class AppController
 
     /// <summary>The last image capture this session, for the repeat hotkey (memory only).</summary>
     LastCapture? _last;
-    OverlayAction _lastAction;
+    /// <summary>How the last capture was delivered, so Repeat does the same (a preset's save-to-folder included).</summary>
+    Func<BitmapSource, SelectionKind, string?, Task>? _lastDeliver;
 
     public async Task CaptureImageAsync(OverlayAction action = OverlayAction.Edit)
     {
@@ -33,7 +34,8 @@ public sealed partial class AppController
             var image = new CroppedBitmap(grab.Image, new Int32Rect((int)r.X, (int)r.Y, (int)r.W, (int)r.H));
             image.Freeze();
             _last = new LastCapture(result.Selection.Kind, new Rct(r.X + grab.OriginX, r.Y + grab.OriginY, r.W, r.H), result.Selection.Window);
-            _lastAction = result.Action;
+            var chosen = result.Action;
+            _lastDeliver = (img, kind, title) => DeliverAsync(img, chosen, kind, title);
             await DeliverAsync(image, result.Action, result.Selection.Kind, result.Selection.Title);
         }
         finally
@@ -64,7 +66,7 @@ public sealed partial class AppController
             }
             var image = CaptureService.Grab((int)r.X, (int)r.Y, (int)r.W, (int)r.H, _settings.IncludeCursor);
             var title = windows.FirstOrDefault(w => w.Handle == last.Window && last.Kind == SelectionKind.Window).Title;
-            await DeliverAsync(image, _lastAction, last.Kind, title);
+            await (_lastDeliver ?? ((img, kind, t) => DeliverAsync(img, OverlayAction.Edit, kind, t)))(image, last.Kind, title);
         }
         finally
         {

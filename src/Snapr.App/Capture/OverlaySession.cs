@@ -12,12 +12,13 @@ public sealed class OverlaySession
     readonly List<CaptureOverlay> _overlays = new();
     readonly HashSet<CaptureOverlay> _closed = new();
 
-    OverlaySession(ScreenGrab grab, IReadOnlyList<WindowInfo> windows, OverlayMode mode, OverlayAction action)
+    OverlaySession(ScreenGrab grab, IReadOnlyList<WindowInfo> windows, OverlayMode mode, OverlayAction action, string? label)
     {
         Grab = grab;
         Windows = windows;
         Mode = mode;
         Action = action;
+        Label = label;
         Virtual = new Rct(0, 0, grab.Image.PixelWidth, grab.Image.PixelHeight);
     }
 
@@ -26,10 +27,11 @@ public sealed class OverlaySession
     public OverlayMode Mode { get; }
     public Rct Virtual { get; }
     public OverlayAction Action { get; private set; }
+    public string? Label { get; }
 
-    public static Task<OverlayResult?> RunAsync(ScreenGrab grab, IReadOnlyList<WindowInfo> windows, OverlayMode mode, OverlayAction initial = OverlayAction.Edit)
+    public static Task<OverlayResult?> RunAsync(ScreenGrab grab, IReadOnlyList<WindowInfo> windows, OverlayMode mode, OverlayAction initial = OverlayAction.Edit, string? label = null)
     {
-        var session = new OverlaySession(grab, windows, mode, initial);
+        var session = new OverlaySession(grab, windows, mode, initial, label);
         session.Open();
         return session._done.Task;
     }
@@ -53,6 +55,7 @@ public sealed class OverlaySession
     /// <summary>C and T switch what an image selection does; pressing the same key again switches back to Edit.</summary>
     public void ToggleAction(OverlayAction action)
     {
+        if (Label is not null) return;   // a preset decides what happens
         if (Mode != OverlayMode.Image) return;
         Action = Action == action ? OverlayAction.Edit : action;
         foreach (var o in _overlays) o.Refresh();

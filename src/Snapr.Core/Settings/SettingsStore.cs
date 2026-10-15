@@ -57,5 +57,20 @@ public static class SettingsStore
         CaptureDelaySeconds = Math.Clamp(s.CaptureDelaySeconds, 0, 10),
         JpgQuality = Math.Clamp(s.JpgQuality, 1, 100),
         ExportFormat = s.ExportFormat is "jpg" ? "jpg" : "png",
+        Presets = CleanPresets(s.Presets),
     };
+
+    /// <summary>A hand-edited file must not stop Snapr: nameless entries are dropped, the rest clamped, at most 20 kept.</summary>
+    static IReadOnlyList<CapturePreset> CleanPresets(IReadOnlyList<CapturePreset>? presets) =>
+        (presets ?? [])
+        .Where(p => p is not null && !string.IsNullOrWhiteSpace(p.Name))
+        .Take(PresetRules.MaxPresets)
+        .Select(p => p with
+        {
+            Id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id,
+            DelaySeconds = Math.Clamp(p.DelaySeconds, 0, 10),
+            Hotkey = p.Hotkey ?? "",
+            SaveFormat = p.SaveFormat is "jpg" ? "jpg" : "png",
+        })
+        .ToArray();
 }

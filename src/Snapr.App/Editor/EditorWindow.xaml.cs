@@ -26,6 +26,7 @@ public partial class EditorWindow : Window
         (ToolKind.Callout, "Callout", Key.K), (ToolKind.Shape, "Shape", Key.S), (ToolKind.Pen, "Pen", Key.P),
         (ToolKind.Highlight, "Highlighter", Key.H), (ToolKind.Step, "Step", Key.N), (ToolKind.Blur, "Blur", Key.B),
         (ToolKind.Magnify, "Magnify", Key.M), (ToolKind.Crop, "Crop", Key.C), (ToolKind.Eraser, "Eraser", Key.E), (ToolKind.Fill, "Fill", Key.F),
+        (ToolKind.Stamp, "Stamp", Key.G),
     ];
 
     readonly AppController _app;

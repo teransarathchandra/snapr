@@ -18,6 +18,7 @@ public enum MagnifyShape { Circle, Rectangle }
 [JsonDerivedType(typeof(BlurAnnotation), "blur")]
 [JsonDerivedType(typeof(MagnifyAnnotation), "magnify")]
 [JsonDerivedType(typeof(ImageAnnotation), "image")]
+[JsonDerivedType(typeof(StampAnnotation), "stamp")]
 public abstract record Annotation
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -54,3 +55,6 @@ public sealed record MagnifyAnnotation(Rct SourceBounds, Pt TargetCenter, double
 
 /// <summary>A picture placed on the capture (for example a Snagit image object). Png is base64-encoded PNG bytes.</summary>
 public sealed record ImageAnnotation(Rct Bounds, string Png) : Annotation;
+
+/// <summary>A built-in stamp (spec parity 6 §2.2): the drawing comes from StampCatalog by Id, filled with Color.</summary>
+public sealed record StampAnnotation(Rct Bounds, string StampId, string Color) : Annotation;

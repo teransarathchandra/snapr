@@ -14,6 +14,7 @@ public static class AnnotationGeometry
         BlurAnnotation x => x.Bounds,
         MagnifyAnnotation x => MagnifyTarget(x),
         ImageAnnotation x => x.Bounds,
+        StampAnnotation x => x.Bounds,
         _ => default,
     };
 
@@ -69,6 +70,7 @@ public static class AnnotationGeometry
         BlurAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         MagnifyAnnotation x => x with { TargetCenter = x.TargetCenter.Offset(dx, dy) },
         ImageAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
+        StampAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         _ => a,
     };
 
@@ -81,6 +83,7 @@ public static class AnnotationGeometry
         BlurAnnotation x => BottomRight(x.Bounds),
         MagnifyAnnotation x => BottomRight(MagnifyTarget(x)),
         ImageAnnotation x => BottomRight(x.Bounds),
+        StampAnnotation x => BottomRight(x.Bounds),
         _ => null,
     };
 
@@ -102,6 +105,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         BlurAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         ImageAnnotation x => x with { Bounds = KeepAspect(x.Bounds, p) },
+        StampAnnotation x => x with { Bounds = KeepAspect(x.Bounds, p) },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(2 * (p.X - x.TargetCenter.X) / Math.Max(1, x.SourceBounds.W), 1.5, 4) },
         _ => a,
     };
@@ -130,6 +134,7 @@ public static class AnnotationGeometry
         StepAnnotation x => x with { Fill = s.Color, Size = StepSize(s.FontSize) },
         HighlightAnnotation x => x with { Color = ColorText.WithAlpha(s.Color, 0x66) },
         PenAnnotation x => x with { Color = s.Color, Width = s.Width },
+        StampAnnotation x => x with { Color = s.Color },
         _ => a,
     }) with { Shadow = a is BlurAnnotation or HighlightAnnotation ? false : s.Shadow };
 
@@ -145,6 +150,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => fallback with { Color = ColorText.WithAlpha(x.Color, 0xFF), Shadow = false },
         PenAnnotation x => fallback with { Color = x.Color, Width = x.Width, Shadow = x.Shadow },
         ImageAnnotation x => fallback with { Shadow = x.Shadow },
+        StampAnnotation x => fallback with { Color = x.Color, Shadow = x.Shadow },
         MagnifyAnnotation x => fallback with { Shadow = x.Shadow },
         _ => fallback,
     };

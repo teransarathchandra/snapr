@@ -3,7 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Snapr Settings" Width="520" SizeToContent="Height" ResizeMode="NoResize"
         Style="{StaticResource SnaprWindow}" WindowStartupLocation="CenterScreen">
-  <StackPanel Margin="24,8,24,24">
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="24,12,24,24">
+      <Button Content="Cancel" IsCancel="True"/>
+      <Button Content="Save" IsDefault="True" Style="{StaticResource AccentButton}" Click="Save_Click"/>
+    </StackPanel>
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel Margin="24,8,24,12">
     <TextBlock Text="HOTKEYS" Style="{StaticResource SectionHeader}"/>
     <TextBlock Text="Click a box and press the new key combination. Backspace clears it (no hotkey)." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,8"/>
     <Grid>
@@ -53,9 +59,15 @@
     <CheckBox x:Name="MicCheck" Content="Record microphone"/>
     <ComboBox x:Name="MicCombo" DisplayMemberPath="Name" Margin="24,4,0,0"/>
 
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
-      <Button Content="Cancel" IsCancel="True"/>
-      <Button Content="Save" IsDefault="True" Style="{StaticResource AccentButton}" Click="Save_Click"/>
+    <TextBlock Text="PRESETS" Style="{StaticResource SectionHeader}"/>
+    <ListBox x:Name="PresetList" Height="120" DisplayMemberPath="Summary" SelectionChanged="PresetList_SelectionChanged"/>
+    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+      <Button x:Name="AddPreset" Content="Add…" Click="AddPreset_Click"/>
+      <Button x:Name="EditPreset" Content="Edit…" Margin="6,0,0,0" Click="EditPreset_Click"/>
+      <Button x:Name="DeletePreset" Content="Delete" Margin="6,0,0,0" Click="DeletePreset_Click"/>
+      <Button x:Name="RunPreset" Content="Run" Margin="6,0,0,0" Click="RunPreset_Click"/>
     </StackPanel>
-  </StackPanel>
+    </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </Window>

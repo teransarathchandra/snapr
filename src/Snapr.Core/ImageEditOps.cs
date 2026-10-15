@@ -60,7 +60,7 @@ public static class ImageEditOps
         _ => new(p => p, 1, false),
     };
 
-    /// <summary>How positions move, how lengths scale, and whether text/callout/image boxes keep their own size (on rotation).</summary>
+    /// <summary>How positions move, how lengths scale, and whether text/callout/image/stamp boxes keep their own size (on rotation).</summary>
     sealed record Map(Func<Pt, Pt> Point, double Scale, bool KeepBoxes)
     {
         public Rct Area(Rct r) => Rct.FromPoints(Point(new Pt(r.X, r.Y)), Point(new Pt(r.Right, r.Bottom)));
@@ -102,6 +102,7 @@ public static class ImageEditOps
             BlurAnnotation x => x with { Bounds = m.Area(x.Bounds) },
             MagnifyAnnotation x => x with { SourceBounds = m.Area(x.SourceBounds), TargetCenter = m.Point(x.TargetCenter) },
             ImageAnnotation x => x with { Bounds = m.Box(x.Bounds) },
+            StampAnnotation x => x with { Bounds = m.Box(x.Bounds) },
             _ => a,
         };
     }

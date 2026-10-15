@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
     {
         _app = app;
         InitializeComponent();
+        MaxHeight = SystemParameters.WorkArea.Height;
         Icon = AppIcon.Render(64);
         var s = app.Settings;
         ImageHotkey.Text = s.Hotkeys.ImageCapture;
@@ -40,6 +41,88 @@ public partial class SettingsWindow : Window
         LoadMicrophones(s.MicDeviceId);
         UpdateFfmpegStatus();
         FfmpegBox.TextChanged += (_, _) => UpdateFfmpegStatus();
+        _presets.AddRange(s.Presets);
+        ShowPresets();
+    }
+
+    sealed record PresetRow(CapturePreset Preset)
+    {
+        public string Summary =>
+            $"{Preset.Name}  ·  {TargetText(Preset.Target)}  ·  {ActionText(Preset.Action)}{(Preset.Hotkey.Length > 0 ? "  ·  " + Preset.Hotkey : "")}";
+        static string TargetText(PresetTarget t) => t switch
+        {
+            PresetTarget.ScreenUnderMouse => "Screen under mouse", PresetTarget.AllScreens => "All screens", PresetTarget.FixedArea => "Fixed area", _ => "Choose area",
+        };
+        static string ActionText(PresetAction a) => a switch
+        {
+            PresetAction.Copy => "Copy", PresetAction.GrabText => "Grab text", PresetAction.SaveToFolder => "Save to folder", _ => "Edit",
+        };
+    }
+
+    readonly List<CapturePreset> _presets = [];
+
+    void ShowPresets(CapturePreset? select = null)
+    {
+        PresetList.ItemsSource = _presets.Select(p => new PresetRow(p)).ToArray();
+        PresetList.SelectedIndex = select is null ? -1 : _presets.FindIndex(p => p.Id == select.Id);
+        PresetList_SelectionChanged(this, null!);
+    }
+
+    CapturePreset? SelectedPreset => (PresetList.SelectedItem as PresetRow)?.Preset;
+
+    void PresetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        EditPreset.IsEnabled = DeletePreset.IsEnabled = RunPreset.IsEnabled = SelectedPreset is not null;
+        AddPreset.IsEnabled = _presets.Count < PresetRules.MaxPresets;
+    }
+
+    /// <summary>The app hotkeys as currently typed in this window (not yet saved), for clash checks.</summary>
+    HotkeySettings TypedHotkeys() => new(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text);
+
+    void AddPreset_Click(object sender, RoutedEventArgs e) => OpenEditor(null);
+
+    void EditPreset_Click(object sender, RoutedEventArgs e) { if (SelectedPreset is { } p) OpenEditor(p); }
+
+    void OpenEditor(CapturePreset? existing)
+    {
+        var others = _presets.Where(p => p.Id != existing?.Id).ToArray();
+        IsEnabled = false;
+        var editor = new PresetEditorWindow(this, _app, existing, others, TypedHotkeys, saved =>
+        {
+            var i = _presets.FindIndex(p => p.Id == saved.Id);
+            if (i >= 0) _presets[i] = saved; else _presets.Add(saved);
+            ShowPresets(saved);
+        });
+        editor.Closed += (_, _) => { IsEnabled = true; Activate(); };
+        editor.Show();
+    }
+
+    void DeletePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedPreset is not { } p) return;
+        if (MessageBox.Show(this, $"Delete the preset {p.Name}?", "Snapr", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        _presets.RemoveAll(x => x.Id == p.Id);
+        ShowPresets();
+    }
+
+    void RunPreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedPreset is not { } p) return;
+        _app.Fire(async () =>
+        {
+            Hide();
+            try
+            {
+                await Task.Delay(250);   // let the window leave the screen before the capture
+                await _app.RunPresetAsync(p);
+            }
+            finally
+            {
+                ShowActivated = false;   // keep the capture editor the preset opened on top
+                Show();
+                ShowActivated = true;
+            }
+        });
     }
 
     void LoadMicrophones(string? selectedId)
@@ -89,8 +172,9 @@ public partial class SettingsWindow : Window
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        var hotkeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text }
+        var appKeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text }
             .Where(h => h.Length > 0).ToArray();   // empty = disabled
+        var hotkeys = appKeys.Concat(_presets.Select(p => p.Hotkey).Where(h => h.Length > 0)).ToArray();
         if (hotkeys.Any(h => !HotkeyGesture.TryParse(h, out _, out _)))
         {
             MessageBox.Show(this, "One of the hotkeys isn't valid. Click the box and press a key combination.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -113,6 +197,7 @@ public partial class SettingsWindow : Window
             RecordSystemAudio = SystemAudioCheck.IsChecked == true,
             RecordMicrophone = MicCheck.IsChecked == true,
             MicDeviceId = (MicCombo.SelectedItem as MicChoice)?.Id,
+            Presets = _presets.ToArray(),
         });
         Close();
     }

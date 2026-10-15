@@ -1,9 +1,13 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using Microsoft.Win32;
 using Snapr.App.Rendering;
+using Snapr.App.Services;
 using Snapr.Core;
 
 namespace Snapr.App.Editor;
@@ -46,6 +50,96 @@ public partial class EditorWindow
         BuildProps();
     }
 
+    /// <summary>Stamp grid (spec parity 6 §2.4): built-in first, then the user's own; Add from file; right-click removes a personal stamp.</summary>
+    void StampPicker(string color)
+    {
+        Label("Stamps");
+        var grid = new WrapPanel();
+        foreach (var def in StampCatalog.All)
+            grid.Children.Add(StampButton(new Image { Source = DocumentRenderer.StampPreview(def.Id, color, 28) }, def.Name,
+                Board.Stamp.BuiltInId == def.Id, () => Board.Stamp = new StampChoice(def.Id, null, 0, 0), remove: null));
+        foreach (var path in _stamps.List())
+        {
+            var thumb = new BitmapImage();
+            thumb.BeginInit();
+            thumb.UriSource = new Uri(path);
+            thumb.DecodePixelWidth = 40;
+            thumb.CacheOption = BitmapCacheOption.OnLoad;   // don't keep the file locked (Remove deletes it)
+            thumb.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            try { thumb.EndInit(); thumb.Freeze(); }
+            catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException) { Log.Write($"Stamp unreadable: {path}", ex); continue; }
+            var name = Path.GetFileNameWithoutExtension(path);
+            grid.Children.Add(StampButton(new Image { Source = thumb, Stretch = Stretch.Uniform }, name,
+                Board.Stamp.BuiltInId is null && Board.Stamp.Png is not null && _stampPath == path,
+                () => PickPersonalStamp(path), remove: () => RemovePersonalStamp(path, name)));
+        }
+        PropsPanel.Children.Add(grid);
+        ButtonRow(("Add stamp from file…", AddPersonalStamp));
+        Hint("Click to place, drag to set the size.");
+    }
+
+    readonly StampLibrary _stamps = new(StampLibrary.DefaultFolder);
+    string? _stampPath;
+
+    Button StampButton(Image image, string name, bool selected, Action pick, Action? remove)
+    {
+        var b = new Button
+        {
+            Content = image, Width = 40, Height = 40, Padding = new Thickness(4), Margin = new Thickness(0, 0, 4, 4), ToolTip = name,
+            BorderThickness = new Thickness(selected ? 2 : 1),
+            BorderBrush = (Brush)FindResource(selected ? "AccentBrush" : "PanelBorderBrush"),
+        };
+        b.Click += (_, _) => { pick(); BuildProps(); };
+        if (remove is not null)
+        {
+            var item = new MenuItem { Header = "Remove from library" };
+            item.Click += (_, _) => remove();
+            b.ContextMenu = new ContextMenu { Items = { item } };
+        }
+        return b;
+    }
+
+    void PickPersonalStamp(string path)
+    {
+        try
+        {
+            var image = ImageObjects.Load(path);
+            Board.Stamp = new StampChoice(null, Convert.ToBase64String(ImageIo.EncodePng(ImageIo.ToBgra(image))), image.PixelWidth, image.PixelHeight);
+            _stampPath = path;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or FileFormatException or UnauthorizedAccessException)
+        {
+            Log.Write($"Stamp unreadable: {path}", ex);
+            _app.Notify("Snapr", $"Snapr couldn't use that stamp: {ex.Message}");
+        }
+    }
+
+    void AddPersonalStamp()
+    {
+        var dialog = new OpenFileDialog { Filter = "Pictures|*.png;*.jpg;*.jpeg;*.bmp;*.gif" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var path = _stamps.Add(dialog.FileName);
+            PickPersonalStamp(path);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or NotSupportedException or FileFormatException or UnauthorizedAccessException or ArgumentException)
+        {
+            Log.Write("Add stamp failed", ex);
+            MessageBox.Show(this, $"Snapr couldn't add that stamp: {ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        BuildProps();
+    }
+
+    void RemovePersonalStamp(string path, string name)
+    {
+        if (MessageBox.Show(this, $"Remove {name} from your stamps? Stamps already placed stay.", "Snapr", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try { _stamps.Remove(path); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Write("Remove stamp failed", ex); _app.Notify("Snapr", ex.Message); }
+        if (_stampPath == path) { Board.Stamp = StampChoice.Default; _stampPath = null; }
+        BuildProps();
+    }
+
     static ToolKind KindOf(Annotation a) => a switch
     {
         ArrowAnnotation => ToolKind.Arrow,
@@ -57,6 +151,7 @@ public partial class EditorWindow
         PenAnnotation => ToolKind.Pen,
         BlurAnnotation => ToolKind.Blur,
         MagnifyAnnotation => ToolKind.Magnify,
+        StampAnnotation => ToolKind.Stamp,
         _ => ToolKind.Move,
     };
 
@@ -70,13 +165,16 @@ public partial class EditorWindow
             return;
         }
         var selected = Board.Selected;
-        var kind = selected is null ? Board.Tool : KindOf(selected);
+        var kind = selected is null ? Board.Tool
+            : selected is ImageAnnotation && Board.Tool == ToolKind.Stamp ? ToolKind.Stamp   // a just-placed personal stamp keeps the Stamp panel
+            : KindOf(selected);
         var style = selected is null ? Board.CurrentStyle : AnnotationGeometry.StyleOf(selected, Board.CurrentStyle);
         var options = selected is null ? Board.Options : AnnotationGeometry.OptionsOf(selected, Board.Options);
         var name = Tools.First(t => t.Tool == kind).Name;
         Header(selected is null ? name : $"{name} · selected");
 
-        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Highlight or ToolKind.Pen or ToolKind.Fill)
+        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Highlight or ToolKind.Pen or ToolKind.Fill
+            || kind == ToolKind.Stamp && selected is not ImageAnnotation && (selected is not null || Board.Stamp.BuiltInId is not null))
         {
             Label("Colour");
             SwatchRow(style.Color, c => ChangeStyle(s => s with { Color = c }));
@@ -101,7 +199,7 @@ public partial class EditorWindow
             ChoiceRow("Lens", [("Circle", MagnifyShape.Circle), ("Rectangle", MagnifyShape.Rectangle)], options.Lens, v => ChangeOptions(o => o with { Lens = v }));
             SliderRow("Zoom", 1.5, 4, options.Zoom, v => ChangeOptions(o => o with { Zoom = v }, "zoom"));
         }
-        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Pen)
+        if (kind is ToolKind.Arrow or ToolKind.Shape or ToolKind.Text or ToolKind.Callout or ToolKind.Step or ToolKind.Pen or ToolKind.Stamp)
             CheckRow("Shadow", style.Shadow, v => ChangeStyle(s => s with { Shadow = v }));
         if (kind == ToolKind.Step)
         {
@@ -118,6 +216,7 @@ public partial class EditorWindow
             SliderRow("Tolerance", 0, 100, options.FillTolerance, v => ChangeOptions(o => o with { FillTolerance = (int)Math.Round(v) }, "tolerance"));
             Hint("Click the image to fill the touching area of similar colour. Objects are not changed.");
         }
+        if (kind == ToolKind.Stamp && Board.Tool == ToolKind.Stamp) StampPicker(style.Color);
         if (kind == ToolKind.Crop)
         {
             Hint("Drag over the image to crop. Pixels outside are kept, so you can reset.");

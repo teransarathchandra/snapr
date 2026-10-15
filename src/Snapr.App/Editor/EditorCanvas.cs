@@ -26,6 +26,7 @@ public sealed class EditorCanvas : Canvas
     Pt _down;
     IReadOnlyList<Guid> _selected = [];
     bool _moved;                 // a Move drag has passed the system drag distance (otherwise it is still a click)
+    Guid _stampId = Guid.NewGuid();   // one Id for the whole Stamp drag, so the picture cache decodes once; fresh per placement
     bool _dragging;            // moving the selection (or resizing _resizeOriginal)
     Annotation? _resizeOriginal;
     Rct? _box;                   // selection box being dragged
@@ -42,6 +43,7 @@ public sealed class EditorCanvas : Canvas
     public event Action? SelectionChanged;
 
     public ToolKind Tool { get; set; } = ToolKind.Arrow;
+    public StampChoice Stamp { get; set; } = StampChoice.Default;
     public ToolStyle CurrentStyle { get; set; } = ToolStyle.Default;
     public ToolOptions Options { get; set; } = ToolOptions.Default;
     public double Zoom { get; set; } = 1;
@@ -288,6 +290,9 @@ public sealed class EditorCanvas : Canvas
                 break;
             case ToolKind.Move or ToolKind.Step or ToolKind.Eraser or ToolKind.Pen or ToolKind.Fill:
                 break;
+            case ToolKind.Stamp:
+                _preview = IsClick(p) ? null : _state.Add(Stamp.Create(StampPlacement.FromDrag(_down, p, Stamp.Aspect), CurrentStyle, _stampId));
+                break;
             default:
                 _preview = AnnotationFactory.FromDrag(Tool, _down, p, CurrentStyle, Options) is { } a ? _state.Add(a) : null;
                 break;
@@ -323,8 +328,12 @@ public sealed class EditorCanvas : Canvas
                 if (_state.HitTest(p, 6 / Zoom) is { } hit) Commit(_state.Remove(hit.Id));
                 break;
             case ToolKind.Fill:
-                if (Math.Abs(p.X - _down.X) * Zoom <= SystemParameters.MinimumHorizontalDragDistance
-                    && Math.Abs(p.Y - _down.Y) * Zoom <= SystemParameters.MinimumVerticalDragDistance) TryFill(p);
+                if (IsClick(p)) TryFill(p);
+                break;
+            case ToolKind.Stamp:
+                var stamp = Stamp.Create(IsClick(p) ? StampPlacement.Centered(_down, Stamp.Aspect) : StampPlacement.FromDrag(_down, p, Stamp.Aspect), CurrentStyle, _stampId);
+                Commit(_state.Add(stamp));
+                Select(stamp);   // the Stamp tool stays active (spec parity 6 §2.4)
                 break;
             case ToolKind.Crop:
                 if (_cropDrag is { W: >= 4, H: >= 4 } c) Commit(_state.SetCrop(c, _base!.PixelWidth, _base.PixelHeight));
@@ -341,6 +350,11 @@ public sealed class EditorCanvas : Canvas
         ResetDrag();
         ReleaseMouseCapture();
     }
+
+    /// <summary>True when the press and release are within the system drag distance (in screen pixels).</summary>
+    bool IsClick(Pt p) =>
+        Math.Abs(p.X - _down.X) * Zoom <= SystemParameters.MinimumHorizontalDragDistance
+        && Math.Abs(p.Y - _down.Y) * Zoom <= SystemParameters.MinimumVerticalDragDistance;
 
     /// <summary>Fill tool click (spec parity 4 §5): adds a fill edit unless the point is outside the image or already that colour.</summary>
     void TryFill(Pt p)
@@ -360,6 +374,7 @@ public sealed class EditorCanvas : Canvas
     void ResetDrag()
     {
         _preview = _textEditor is null ? null : _preview;
+        _stampId = Guid.NewGuid();
         _dragging = false;
         _moved = false;
         _resizeOriginal = null;
