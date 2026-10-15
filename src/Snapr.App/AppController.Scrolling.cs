@@ -25,7 +25,7 @@ public sealed partial class AppController
             }
             OpenNewCapture(ImageIo.FromFrame(stitched.Image), CaptureKind.Scrolling, target.Title);
             if (!stitched.Complete)
-                Notify("Scrolling stopped early", "Snapr couldn't match the next part of the page, or it got too long, so it kept what it captured.");
+                Notify("Scrolling stopped early", "Snapr kept what it captured: the page was too long, Esc was pressed, or the next part couldn't be matched.");
         }
         finally
         {

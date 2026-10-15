@@ -15,7 +15,7 @@ public static class Stitcher
 
         var end = w > ignoreRightColumns ? w - ignoreRightColumns : w;
         var start = ignoreLeftColumns < end ? ignoreLeftColumns : 0;
-        var cols = new Range(start, end);
+        var cols = MovingColumns(frames, start, end);
         var hashes = frames.Select(f => RowHashes(f, cols)).ToArray();
         var header = CommonPrefix(hashes, h);
         var footer = header >= h ? 0 : CommonSuffix(hashes, h, header);
@@ -32,11 +32,12 @@ public static class Stitcher
             var cur = frames[i];
             if (hashes[i].AsSpan().SequenceEqual(hashes[i - 1])) break;
 
-            var k = Overlap(prev, cur, hashes[i - 1], hashes[i], header, regionH, cols, tolerance);
+            var (k, edge) = Overlap(prev, cur, hashes[i - 1], hashes[i], header, regionH, cols, tolerance);
             if (k == 0) { complete = false; break; }
 
             var newRows = regionH - k;
-            if (output.Count / w + newRows + footer > maxHeight) { complete = false; break; }
+            if (output.Count / w - edge + newRows + footer > maxHeight) { complete = false; break; }
+            output.RemoveRange(output.Count - w * edge, w * edge);   // the blended edge rows are taken from cur instead
             output.AddRange(cur.Pixels.AsSpan(w * (header + k), w * newRows).ToArray());
             last = cur;
         }
@@ -50,29 +51,56 @@ public static class Stitcher
         return new StitchResult(new Frame(w, output.Count / w, output.ToArray()), complete);
     }
 
-    /// <summary>Largest k such that prev's last k region rows equal cur's first k region rows; 0 if none.</summary>
-    static int Overlap(Frame prev, Frame cur, ulong[] ph, ulong[] ch, int header, int regionH, Range cols, int tol)
+    /// <summary>The columns in [start, end) that differ between frames somewhere. Columns that are the same in every
+    /// frame belong to the window, not the scrolled content (a browser's shaded edge, rounded corners, blank margins),
+    /// so they carry nothing to match on and can block every match. All of [start, end) if no column moves.</summary>
+    static int[] MovingColumns(IReadOnlyList<Frame> frames, int start, int end)
     {
-        for (var k = regionH - 1; k >= 1; k--)
+        int w = frames[0].Width, h = frames[0].Height;
+        var moving = new List<int>();
+        for (var x = start; x < end; x++)
         {
+            var still = true;
+            for (var i = 1; i < frames.Count && still; i++)
+                for (var y = 0; y < h && still; y++)
+                    still = frames[i].Pixels[y * w + x] == frames[0].Pixels[y * w + x];
+            if (!still) moving.Add(x);
+        }
+        return moving.Count > 0 ? moving.ToArray() : Enumerable.Range(start, end - start).ToArray();
+    }
+
+    /// <summary>Rows right above the footer that may be blended with the window's semi-transparent bottom edge (Edge
+    /// does this to its last content row), left out of matching when the plain match fails.</summary>
+    const int MaxEdgeRows = 2;
+
+    /// <summary>Largest k such that prev's region rows, without its last <c>edge</c> rows, end with k rows that match
+    /// cur's first k region rows within the tolerance. The fewest edge rows are tried first; k = 0 if none match.</summary>
+    static (int K, int Edge) Overlap(Frame prev, Frame cur, ulong[] ph, ulong[] ch, int header, int regionH, int[] cols, int tol)
+    {
+        for (var edge = 0; edge <= MaxEdgeRows; edge++)
+        for (var k = regionH - 1 - edge; k >= 1; k--)
+        {
+            // Equal hashes are the fast path; a row under a window's semi-transparent edge differs slightly, so it
+            // falls back to the tolerant comparison.
             var match = true;
             for (var r = 0; r < k && match; r++)
-                match = ph[header + regionH - k + r] == ch[header + r];
+                match = ph[header + regionH - edge - k + r] == ch[header + r]
+                    || RowsClose(prev.Row(header + regionH - edge - k + r), cur.Row(header + r), cols, tol);
             if (!match) continue;
 
             var verified = true;
             for (var r = 0; r < k && verified; r++)
-                verified = RowsClose(prev.Row(header + regionH - k + r)[cols], cur.Row(header + r)[cols], tol);
-            if (verified) return k;
+                verified = RowsClose(prev.Row(header + regionH - edge - k + r), cur.Row(header + r), cols, tol);
+            if (verified) return (k, edge);
         }
-        return 0;
+        return (0, 0);
     }
 
-    static bool RowsClose(ReadOnlySpan<uint> a, ReadOnlySpan<uint> b, int tol)
+    static bool RowsClose(ReadOnlySpan<uint> a, ReadOnlySpan<uint> b, int[] cols, int tol)
     {
-        for (var i = 0; i < a.Length; i++)
+        foreach (var c in cols)
         {
-            uint x = a[i], y = b[i];
+            uint x = a[c], y = b[c];
             if (x == y) continue;
             for (var shift = 0; shift < 32; shift += 8)
                 if (Math.Abs((int)((x >> shift) & 0xFF) - (int)((y >> shift) & 0xFF)) > tol) return false;
@@ -80,13 +108,14 @@ public static class Stitcher
         return true;
     }
 
-    static ulong[] RowHashes(Frame f, Range cols)
+    static ulong[] RowHashes(Frame f, int[] cols)
     {
         var hashes = new ulong[f.Height];
         for (var y = 0; y < f.Height; y++)
         {
             var h = 14695981039346656037UL;
-            foreach (var px in f.Row(y)[cols]) h = (h ^ px) * 1099511628211UL;
+            var row = f.Row(y);
+            foreach (var c in cols) h = (h ^ row[c]) * 1099511628211UL;
             hashes[y] = h;
         }
         return hashes;

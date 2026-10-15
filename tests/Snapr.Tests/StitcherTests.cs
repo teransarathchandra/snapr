@@ -130,4 +130,59 @@ public class StitcherTests
         Assert.True(result.Complete);
         Assert.Equal(Header + 60 + Body + Footer, result.Image.Height);
     }
+
+    [Fact]
+    public void Window_fixed_edge_shading_is_ignored()
+    {
+        // Browsers such as Edge draw a shaded strip down the content's left edge: it changes from row to row but
+        // belongs to the window, so it is the same in every frame and must not take part in matching.
+        var page = Page(300);
+        var frames = new[] { 0, 30, 60 }.Select(o => View(page, o)).ToArray();
+        foreach (var f in frames)
+            for (var y = 0; y < ViewH; y++)
+            for (var x = 0; x < 9; x++)
+                f.Pixels[y * W + x] = 0xFF000000u | (uint)(y * 0x020202);
+
+        var result = Stitcher.Stitch(frames, ignoreRightColumns: 0);
+
+        Assert.True(result.Complete);
+        Assert.Equal(Header + 60 + Body + Footer, result.Image.Height);
+    }
+
+    [Fact]
+    public void Edge_row_blended_by_one_level_still_matches()
+    {
+        // The last content row sits under the window's semi-transparent bottom edge, which shifts colours by 1.
+        var page = Page(300);
+        var frames = new[] { 0, 30, 60 }.Select(o => View(page, o)).ToArray();
+        foreach (var f in frames)
+            for (var x = 0; x < W; x++)
+                f.Pixels[(ViewH - Footer - 1) * W + x] ^= 1;
+
+        var result = Stitcher.Stitch(frames, ignoreRightColumns: 0);
+
+        Assert.True(result.Complete);
+        Assert.Equal(Header + 60 + Body + Footer, result.Image.Height);
+    }
+
+    [Fact]
+    public void Strongly_blended_edge_row_is_replaced_by_the_next_frame()
+    {
+        // Edge blends its last content row with the window edge by up to ~10 levels: too much for the tolerance, so
+        // that row must be left out of matching and taken from the next frame, leaving no line inside the image.
+        var page = Page(300);
+        var frames = new[] { 0, 30, 60 }.Select(o => View(page, o)).ToArray();
+        foreach (var f in frames)
+            for (var x = 0; x < W; x++)
+            {
+                var i = (ViewH - Footer - 1) * W + x;
+                f.Pixels[i] = (f.Pixels[i] & 0xFF000000u) | ((f.Pixels[i] & 0x00F0F0F0u) >> 1) | 0x00080808u;
+            }
+
+        var result = Stitcher.Stitch(frames, ignoreRightColumns: 0);
+
+        Assert.True(result.Complete);
+        Assert.Equal(Header + 60 + Body + Footer, result.Image.Height);
+        Assert.Equal(page.AsSpan((Body - 1) * W, W).ToArray(), result.Image.Row(Header + Body - 1).ToArray());
+    }
 }
