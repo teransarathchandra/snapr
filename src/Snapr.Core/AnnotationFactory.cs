@@ -18,12 +18,13 @@ public static class AnnotationFactory
             ToolKind.Shape => new ShapeAnnotation(o.Shape == ShapeOption.Ellipse ? ShapeKind.Ellipse : ShapeKind.Rectangle, r, s.Color, s.Width, s.Fill),
             ToolKind.Highlight => new HighlightAnnotation(r, ColorText.WithAlpha(s.Color, 0x66)),
             ToolKind.Blur => new BlurAnnotation(r, o.Blur, Math.Clamp(o.BlurStrength, 1, 20)),
+            ToolKind.Spotlight => new SpotlightAnnotation(r, o.Spot, Math.Clamp(o.SpotDim, 0, 90), o.SpotBlur),
             ToolKind.Magnify => new MagnifyAnnotation(r, new Pt(r.Right + r.W * o.Zoom / 2 + 12, r.Y + r.H / 2), Math.Clamp(o.Zoom, 1.5, 4), o.Lens),
             ToolKind.Callout => new CalloutAnnotation(r, "", s.FontSize, s.Fill ?? "#FFFFFFFF", s.Color, "#FF111111",
                 new Pt(r.X + r.W * 0.25, r.Bottom + Math.Max(24, r.H * 0.5))),
             _ => null,
         };
-        return made is null ? null : made with { Shadow = s.Shadow && tool is not (ToolKind.Blur or ToolKind.Highlight) };
+        return made is null ? null : made with { Shadow = s.Shadow && tool is not (ToolKind.Blur or ToolKind.Highlight or ToolKind.Spotlight) };
     }
 
     public static TextAnnotation Text(Pt at, ToolStyle s) =>

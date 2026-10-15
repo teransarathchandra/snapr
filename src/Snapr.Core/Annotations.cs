@@ -19,6 +19,7 @@ public enum MagnifyShape { Circle, Rectangle }
 [JsonDerivedType(typeof(MagnifyAnnotation), "magnify")]
 [JsonDerivedType(typeof(ImageAnnotation), "image")]
 [JsonDerivedType(typeof(StampAnnotation), "stamp")]
+[JsonDerivedType(typeof(SpotlightAnnotation), "spotlight")]
 public abstract record Annotation
 {
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -58,3 +59,8 @@ public sealed record ImageAnnotation(Rct Bounds, string Png) : Annotation;
 
 /// <summary>A built-in stamp (spec parity 6 §2.2): the drawing comes from StampCatalog by Id, filled with Color.</summary>
 public sealed record StampAnnotation(Rct Bounds, string StampId, string Color) : Annotation;
+
+public enum SpotlightShape { Rectangle, Ellipse }
+
+/// <summary>Keeps Bounds bright while everything outside every spotlight is dimmed by Dim % (0–90) and blurred if Blur (spec parity 7 §3).</summary>
+public sealed record SpotlightAnnotation(Rct Bounds, SpotlightShape Shape, int Dim, bool Blur) : Annotation;

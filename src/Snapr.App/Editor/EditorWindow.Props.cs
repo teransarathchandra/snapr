@@ -152,6 +152,7 @@ public partial class EditorWindow
         BlurAnnotation => ToolKind.Blur,
         MagnifyAnnotation => ToolKind.Magnify,
         StampAnnotation => ToolKind.Stamp,
+        SpotlightAnnotation => ToolKind.Spotlight,
         _ => ToolKind.Move,
     };
 
@@ -194,6 +195,18 @@ public partial class EditorWindow
             ChoiceRow("Type", [("Pixelate", BlurMode.Pixelate), ("Blur", BlurMode.Blur)], options.Blur, v => ChangeOptions(o => o with { Blur = v }));
             SliderRow("Strength", 1, 20, options.BlurStrength, v => ChangeOptions(o => o with { BlurStrength = (int)v }, "strength"));
         }
+        if (kind == ToolKind.Spotlight)
+        {
+            ChoiceRow("Shape", [("Rectangle", SpotlightShape.Rectangle), ("Ellipse", SpotlightShape.Ellipse)], options.Spot, v => ChangeOptions(o => o with { Spot = v }));
+            SliderRow("Dim", 0, 90, options.SpotDim, v => ChangeOptions(o => o with { SpotDim = (int)Math.Round(v) }, "dim"));
+            CheckRow("Blur", options.SpotBlur, v => ChangeOptions(o => o with { SpotBlur = v }));
+        }
+        if (kind == ToolKind.CutOut)
+        {
+            ChoiceRow("Direction", [("Horizontal strip", false), ("Vertical strip", true)], Board.CutVertical, v => { Board.CutVertical = v; BuildProps(); });
+            ChoiceRow("Join", [("Straight", CutJoin.Straight), ("Torn", CutJoin.Torn)], Board.CutJoin, v => { Board.CutJoin = v; BuildProps(); });
+            Hint("Drag across the part to remove.");
+        }
         if (kind == ToolKind.Magnify)
         {
             ChoiceRow("Lens", [("Circle", MagnifyShape.Circle), ("Rectangle", MagnifyShape.Rectangle)], options.Lens, v => ChangeOptions(o => o with { Lens = v }));
@@ -227,7 +240,7 @@ public partial class EditorWindow
             ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(selected.Id))),
                       ("Send to back", () => Board.Apply(s => s.SendToBack(selected.Id))),
                       ("Delete", Board.DeleteSelected));
-        else if (kind is not (ToolKind.Move or ToolKind.Crop or ToolKind.Eraser))
+        else if (kind is not (ToolKind.Move or ToolKind.Crop or ToolKind.Eraser or ToolKind.CutOut or ToolKind.Spotlight))
             ButtonRow(("Save as quick style", () => { _app.SaveQuickStyle(Board.Tool, Board.CurrentStyle); _app.Notify("Quick style saved", $"{name} will start with this style."); }));
 
         EffectsProps();
@@ -248,9 +261,20 @@ public partial class EditorWindow
     {
         var units = Board.State.UnitCount(Board.SelectedIds);
         Header($"{many.Count} objects");
-        Label("Colour");
-        SwatchRow(AnnotationGeometry.StyleOf(many[0], Board.CurrentStyle).Color, c => ChangeStyle(s => s with { Color = c }));
-        var shadowable = many.Where(a => a is not (BlurAnnotation or HighlightAnnotation)).ToArray();
+        if (many.All(a => a is SpotlightAnnotation))
+        {
+            // Spotlights have no colour; ChangeOptions applies to every selected object, each keeping its other settings.
+            var options = AnnotationGeometry.OptionsOf(many[0], Board.Options);
+            ChoiceRow("Shape", [("Rectangle", SpotlightShape.Rectangle), ("Ellipse", SpotlightShape.Ellipse)], options.Spot, v => ChangeOptions(o => o with { Spot = v }));
+            SliderRow("Dim", 0, 90, options.SpotDim, v => ChangeOptions(o => o with { SpotDim = (int)Math.Round(v) }, "dim"));
+            CheckRow("Blur", options.SpotBlur, v => ChangeOptions(o => o with { SpotBlur = v }));
+        }
+        else
+        {
+            Label("Colour");
+            SwatchRow(AnnotationGeometry.StyleOf(many[0], Board.CurrentStyle).Color, c => ChangeStyle(s => s with { Color = c }));
+        }
+        var shadowable = many.Where(a => a is not (BlurAnnotation or HighlightAnnotation or SpotlightAnnotation)).ToArray();
         if (shadowable.Length > 0) CheckRow("Shadow", shadowable.All(a => a.Shadow), v => ChangeStyle(s => s with { Shadow = v }));
         if (units >= 2)
         {

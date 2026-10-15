@@ -54,8 +54,12 @@ public static class DocumentOps
 
     public static DocumentState SetEffects(this DocumentState s, DocumentEffects e) => s with { Effects = e };
 
-    public static Annotation? HitTest(this DocumentState s, Pt p, double tol) =>
-        Enumerable.Reverse(s.Annotations).FirstOrDefault(a => AnnotationGeometry.Hit(a, p, tol));
+    /// <summary>Topmost object under the point. A spotlight is a backdrop, so it is hit only when nothing else is.</summary>
+    public static Annotation? HitTest(this DocumentState s, Pt p, double tol)
+    {
+        var hits = Enumerable.Reverse(s.Annotations).Where(a => AnnotationGeometry.Hit(a, p, tol)).ToArray();
+        return hits.FirstOrDefault(a => a is not SpotlightAnnotation) ?? hits.FirstOrDefault();
+    }
 
     /// <summary>Sets the text of a Text or Callout. A Text left blank is removed; an empty Callout is kept.</summary>
     public static DocumentState CommitText(this DocumentState s, Guid id, string text)

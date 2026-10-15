@@ -27,6 +27,8 @@ public partial class EditorWindow : Window
         (ToolKind.Highlight, "Highlighter", Key.H), (ToolKind.Step, "Step", Key.N), (ToolKind.Blur, "Blur", Key.B),
         (ToolKind.Magnify, "Magnify", Key.M), (ToolKind.Crop, "Crop", Key.C), (ToolKind.Eraser, "Eraser", Key.E), (ToolKind.Fill, "Fill", Key.F),
         (ToolKind.Stamp, "Stamp", Key.G),
+        (ToolKind.CutOut, "Cut out", Key.U),
+        (ToolKind.Spotlight, "Spotlight", Key.L),
     ];
 
     readonly AppController _app;
@@ -52,6 +54,7 @@ public partial class EditorWindow : Window
         LogoImage.Source = AppIcon.Render(40);
         _autosave.Tick += (_, _) => { _autosave.Stop(); SaveNow(); };
         Board.Committed += OnCommitted;
+        Board.Message += text => _app.Notify("Cut out", text);
         Board.SelectionChanged += BuildProps;
         CanvasScroller.SizeChanged += (_, _) => ApplyZoom();
         PreviewKeyDown += OnKey;

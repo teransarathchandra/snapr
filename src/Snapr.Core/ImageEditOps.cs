@@ -57,6 +57,7 @@ public static class ImageEditOps
         FlipEdit => Mapping(e, nw, nh, w, h),
         ResizeEdit => Scaled((double)w / nw, (double)h / nh) with { Scale = 1 / (((double)nw / w + (double)nh / h) / 2) },
         MarginsEdit m => new(p => new Pt(p.X - m.Left, p.Y - m.Top), 1, false),
+        CutOutEdit c => new(p => Uncut(p, c), 1, true),
         _ => new(p => p, 1, false),
     };
 
@@ -82,6 +83,7 @@ public static class ImageEditOps
         FlipEdit => new(p => new Pt(p.X, h - p.Y), 1, false),
         ResizeEdit => Scaled((double)nw / w, (double)nh / h),
         MarginsEdit m => new(p => new Pt(p.X + m.Left, p.Y + m.Top), 1, false),
+        CutOutEdit c => new(p => Cut(p, c), 1, true),
         _ => new(p => p, 1, false),
     };
 
@@ -100,6 +102,7 @@ public static class ImageEditOps
             HighlightAnnotation x => x with { Bounds = m.Area(x.Bounds) },
             PenAnnotation x => x with { Points = x.Points.Select(m.Point).ToArray(), Width = x.Width * s },
             BlurAnnotation x => x with { Bounds = m.Area(x.Bounds) },
+            SpotlightAnnotation x => x with { Bounds = m.Area(x.Bounds) },
             MagnifyAnnotation x => x with { SourceBounds = m.Area(x.SourceBounds), TargetCenter = m.Point(x.TargetCenter) },
             ImageAnnotation x => x with { Bounds = m.Box(x.Bounds) },
             StampAnnotation x => x with { Bounds = m.Box(x.Bounds) },
@@ -108,4 +111,11 @@ public static class ImageEditOps
     }
 
     static Pt TopLeft(Rct r) => new(r.X, r.Y);
+
+    /// <summary>Along the cut axis: before the strip unchanged, inside it onto the seam, after it moved back by the strip width.</summary>
+    static Pt Cut(Pt p, CutOutEdit c) => c.Vertical ? p with { X = CutAxis(p.X, c) } : p with { Y = CutAxis(p.Y, c) };
+    static double CutAxis(double v, CutOutEdit c) => v < c.Start ? v : v < c.End ? c.Start : v - (c.End - c.Start);
+
+    static Pt Uncut(Pt p, CutOutEdit c) => c.Vertical ? p with { X = UncutAxis(p.X, c) } : p with { Y = UncutAxis(p.Y, c) };
+    static double UncutAxis(double v, CutOutEdit c) => v < c.Start ? v : v + (c.End - c.Start);
 }

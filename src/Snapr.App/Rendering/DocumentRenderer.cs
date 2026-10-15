@@ -18,6 +18,8 @@ public static class DocumentRenderer
     public static void DrawScene(DrawingContext dc, BitmapSource baseImage, DocumentState state)
     {
         dc.DrawImage(baseImage, new Rect(0, 0, baseImage.PixelWidth, baseImage.PixelHeight));
+        var spots = state.Annotations.OfType<SpotlightAnnotation>().ToArray();
+        if (spots.Length > 0) DrawSpotlights(dc, baseImage, spots);
         foreach (var a in state.Annotations) DrawAnnotation(dc, baseImage, a);
         PrunePictures(state);
     }
@@ -79,6 +81,30 @@ public static class DocumentRenderer
             case ImageAnnotation x: DrawImageObject(dc, x); break;
             case StampAnnotation x: DrawStamp(dc, x); break;
         }
+    }
+
+    /// <summary>One backdrop for all spotlights (spec parity 7 §3.2): outside their union the base is blurred if any asks
+    /// for it, then darkened by the largest Dim.</summary>
+    static void DrawSpotlights(DrawingContext dc, BitmapSource src, IReadOnlyList<SpotlightAnnotation> all)
+    {
+        var spots = all.Where(s => s.Bounds.W > 0 && s.Bounds.H > 0).ToArray(); // a cut can collapse one to nothing
+        if (spots.Length == 0) return;
+        var holes = new GeometryGroup { FillRule = FillRule.Nonzero };
+        foreach (var s in spots)
+            holes.Children.Add(s.Shape == SpotlightShape.Ellipse ? new EllipseGeometry(R(s.Bounds)) : new RectangleGeometry(R(s.Bounds)));
+        var outside = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(0, 0, src.PixelWidth, src.PixelHeight)), holes);
+        outside.Freeze();
+        if (spots.Any(s => s.Blur))
+        {
+            dc.PushClip(outside);
+            DrawBlur(dc, src, new BlurAnnotation(new Rct(0, 0, src.PixelWidth, src.PixelHeight), BlurMode.Blur, 12));
+            dc.Pop();
+        }
+        var dim = spots.Max(s => Math.Clamp(s.Dim, 0, 90));
+        if (dim == 0) return;
+        var brush = new SolidColorBrush(Color.FromArgb((byte)Math.Round(dim * 2.55), 0, 0, 0));
+        brush.Freeze();
+        dc.DrawGeometry(brush, null, outside);
     }
 
     static Rect R(Rct r) => new(r.X, r.Y, Math.Max(0, r.W), Math.Max(0, r.H));

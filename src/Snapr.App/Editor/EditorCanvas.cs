@@ -36,11 +36,15 @@ public sealed class EditorCanvas : Canvas
     Rct? _cropDrag;
     TextBox? _textEditor;
     Annotation? _textTarget;
+    (int Start, int End)? _cutDrag;
     bool _textIsNew;
 
     /// <summary>A finished edit. A non-null merge key lets the window merge repeated edits (slider drags) into one undo step.</summary>
     public event Action<DocumentState, string?>? Committed;
     public event Action? SelectionChanged;
+    public event Action<string>? Message;
+    public bool CutVertical { get; set; }
+    public CutJoin CutJoin { get; set; } = CutJoin.Torn;
 
     public ToolKind Tool { get; set; } = ToolKind.Arrow;
     public StampChoice Stamp { get; set; } = StampChoice.Default;
@@ -154,6 +158,7 @@ public sealed class EditorCanvas : Canvas
         var state = _preview ?? _state;
         DocumentRenderer.DrawScene(dc, _base, state);
         if (_cropDrag is { } c) DrawCropPreview(dc, c);
+        if (_cutDrag is { } cut) DrawCutPreview(dc, cut);
         if (_box is { } box) dc.DrawRectangle(BoxFill, new Pen(Accent, 1 / Zoom) { DashStyle = DashStyles.Dash }, ToRect(box));
         DrawSelection(dc, state);
         dc.Pop();
@@ -168,6 +173,17 @@ public sealed class EditorCanvas : Canvas
         dc.DrawGeometry(CropDim, null, outside);
         dc.DrawRectangle(null, new Pen(Accent, 2 / Zoom), new Rect(c.X, c.Y, c.W, c.H));
     }
+
+    void DrawCutPreview(DrawingContext dc, (int Start, int End) cut)
+    {
+        var v = _base is null ? default : new Rct(0, 0, _base.PixelWidth, _base.PixelHeight);
+        var band = CutVertical ? new Rect(cut.Start, v.Y, cut.End - cut.Start, v.H) : new Rect(v.X, cut.Start, v.W, cut.End - cut.Start);
+        dc.DrawRectangle(CutFill, new Pen(CutLine, 1.5 / Zoom) { DashStyle = DashStyles.Dash }, band);
+    }
+
+    static readonly Brush CutFill = Frozen(new SolidColorBrush(Color.FromArgb(0x80, 0xFF, 0x3B, 0x30)));
+    static readonly Brush CutLine = Frozen(new SolidColorBrush(Color.FromRgb(0xFF, 0x3B, 0x30)));
+    static Brush Frozen(Brush b) { b.Freeze(); return b; }
 
     double HandleSize => 10 / Zoom;
 
@@ -288,6 +304,9 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.Crop:
                 _cropDrag = Rct.FromPoints(_down, p);
                 break;
+            case ToolKind.CutOut:
+                _cutDrag = IsClick(p) ? null : Strip(_down, p);
+                break;
             case ToolKind.Move or ToolKind.Step or ToolKind.Eraser or ToolKind.Pen or ToolKind.Fill:
                 break;
             case ToolKind.Stamp:
@@ -338,6 +357,15 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.Crop:
                 if (_cropDrag is { W: >= 4, H: >= 4 } c) Commit(_state.SetCrop(c, _base!.PixelWidth, _base.PixelHeight));
                 break;
+            case ToolKind.CutOut:
+                if (!IsClick(p) && Strip(_down, p) is { } strip && strip.End - strip.Start >= 2)
+                {
+                    var size = (_base!.PixelWidth, _base.PixelHeight);
+                    var next = _state.ApplyEdit(size, new CutOutEdit(CutVertical, strip.Start, strip.End, CutJoin));
+                    if (ReferenceEquals(next, _state)) Message?.Invoke("That would leave the image too small.");
+                    else Commit(next);
+                }
+                break;
             default:
                 if (AnnotationFactory.FromDrag(Tool, _down, p, CurrentStyle, Options) is { } a)
                 {
@@ -349,6 +377,16 @@ public sealed class EditorCanvas : Canvas
         }
         ResetDrag();
         ReleaseMouseCapture();
+    }
+
+    /// <summary>The strip on the chosen axis, rounded to whole pixels and clamped to the image.</summary>
+    (int Start, int End)? Strip(Pt a, Pt b)
+    {
+        if (_base is null) return null;
+        var max = CutVertical ? _base.PixelWidth : _base.PixelHeight;
+        double u = CutVertical ? a.X : a.Y, v = CutVertical ? b.X : b.Y;
+        int s = (int)Math.Clamp(Math.Floor(Math.Min(u, v)), 0, max), e = (int)Math.Clamp(Math.Ceiling(Math.Max(u, v)), 0, max);
+        return (s, e);
     }
 
     /// <summary>True when the press and release are within the system drag distance (in screen pixels).</summary>
@@ -383,6 +421,7 @@ public sealed class EditorCanvas : Canvas
         _additive = false;
         _pen = null;
         _cropDrag = null;
+        _cutDrag = null;
         InvalidateVisual();
     }
 

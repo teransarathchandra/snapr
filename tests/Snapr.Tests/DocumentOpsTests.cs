@@ -79,6 +79,25 @@ public class DocumentOpsTests
     }
 
     [Fact]
+    public void HitTest_prefers_other_objects_over_a_spotlight_above_them()
+    {
+        var arrow = new ShapeAnnotation(ShapeKind.Rectangle, new(0, 0, 50, 50), "#FF000000", 2, "#FF000000");
+        var spot = new SpotlightAnnotation(new(0, 0, 100, 100), SpotlightShape.Rectangle, 50, false);
+        var s = DocumentState.Empty.Add(arrow).Add(spot);
+
+        Assert.Equal(arrow.Id, s.HitTest(new(20, 20), 2)!.Id);
+    }
+
+    [Fact]
+    public void HitTest_returns_a_spotlight_when_nothing_else_is_there()
+    {
+        var spot = new SpotlightAnnotation(new(0, 0, 100, 100), SpotlightShape.Rectangle, 50, false);
+        var s = DocumentState.Empty.Add(spot);
+
+        Assert.Equal(spot.Id, s.HitTest(new(20, 20), 2)!.Id);
+    }
+
+    [Fact]
     public void SameAs_detects_no_op_edits()
     {
         var s = DocumentState.Empty.AddStep(new(1, 1), Red);

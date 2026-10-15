@@ -10,6 +10,7 @@ namespace Snapr.Core;
 [JsonDerivedType(typeof(ResizeEdit), "resize")]
 [JsonDerivedType(typeof(MarginsEdit), "margins")]
 [JsonDerivedType(typeof(FillEdit), "fill")]
+[JsonDerivedType(typeof(CutOutEdit), "cutout")]
 public abstract record ImageEdit;
 
 /// <summary>QuarterTurns: 1 = 90° right, 2 = 180°, 3 = 90° left.</summary>
@@ -26,12 +27,18 @@ public sealed record MarginsEdit(int Left, int Top, int Right, int Bottom, strin
 /// <summary>Flood fill at pixel (X, Y) of the image produced by the earlier edits.</summary>
 public sealed record FillEdit(int X, int Y, string Color, int Tolerance) : ImageEdit;
 
+public enum CutJoin { Straight, Torn }
+
+/// <summary>Removes a strip and closes the gap (spec parity 7 §2): columns [Start, End) when Vertical, otherwise rows.</summary>
+public sealed record CutOutEdit(bool Vertical, int Start, int End, CutJoin Join) : ImageEdit;
+
 public static class ImageEditRules
 {
     public const int MaxEdits = 1_000;
     public const int MaxSide = 32_000;
     public const long MaxPixels = 100_000_000;
     public const int MaxMargin = 4_000;
+    public const int MinCutSide = 16;
 
     public static bool SizeOk(long w, long h) => w >= 1 && h >= 1 && w <= MaxSide && h <= MaxSide && w * h <= MaxPixels;
 
@@ -41,6 +48,7 @@ public static class ImageEditRules
         RotateEdit { QuarterTurns: 1 or 3 } => (h, w),
         ResizeEdit r => (r.Width, r.Height),
         MarginsEdit m => (w + m.Left + m.Right, h + m.Top + m.Bottom),
+        CutOutEdit c => c.Vertical ? (w - (c.End - c.Start), h) : (w, h - (c.End - c.Start)),
         _ => (w, h),
     };
 
@@ -70,6 +78,8 @@ public static class ImageEditRules
         ResizeEdit => true,
         MarginsEdit m => Margin(m.Left) && Margin(m.Top) && Margin(m.Right) && Margin(m.Bottom) && ColorText.TryArgb(m.Color, out _),
         FillEdit f => f.X >= 0 && f.Y >= 0 && f.X < w && f.Y < h && f.Tolerance is >= 0 and <= 100 && ColorText.TryArgb(f.Color, out _),
+        CutOutEdit c => c.Start >= 0 && c.End > c.Start && c.End <= (c.Vertical ? w : h)
+            && (c.Vertical ? w : h) - (c.End - c.Start) >= MinCutSide && Enum.IsDefined(c.Join),
         _ => false,
     };
 

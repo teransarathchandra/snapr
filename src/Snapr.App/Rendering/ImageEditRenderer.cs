@@ -18,8 +18,45 @@ public static class ImageEditRenderer
             dc => dc.DrawImage(image, new Rect(m.Left, m.Top, image.PixelWidth, image.PixelHeight))),
         FillEdit f when ColorText.TryArgb(f.Color, out var argb) =>
             ImageIo.FromFrame(FloodFill.Fill(ImageIo.ToFrame(image), f.X, f.Y, argb, f.Tolerance)),
+        CutOutEdit c => Cut(image, c),
         _ => image,
     };
+
+    /// <summary>Copies the pieces before and after the strip next to each other; Torn adds a white zigzag seam (spec parity 7 §2.2).</summary>
+    static BitmapSource Cut(BitmapSource image, CutOutEdit c)
+    {
+        int w = image.PixelWidth, h = image.PixelHeight, gap = c.End - c.Start;
+        int nw = c.Vertical ? w - gap : w, nh = c.Vertical ? h : h - gap;
+        int after = (c.Vertical ? w : h) - c.End;
+        return Draw(nw, nh, null, BitmapScalingMode.NearestNeighbor, dc =>
+        {
+            if (c.Start > 0)
+            {
+                var first = c.Vertical ? new Int32Rect(0, 0, c.Start, h) : new Int32Rect(0, 0, w, c.Start);
+                dc.DrawImage(new CroppedBitmap(image, first), new Rect(0, 0, first.Width, first.Height));
+            }
+            if (after > 0)
+            {
+                var rest = c.Vertical ? new Int32Rect(c.End, 0, after, h) : new Int32Rect(0, c.End, w, after);
+                dc.DrawImage(new CroppedBitmap(image, rest), c.Vertical ? new Rect(c.Start, 0, after, h) : new Rect(0, c.Start, w, after));
+            }
+            if (c.Join == CutJoin.Torn) dc.DrawGeometry(Brushes.White, null, TornSeam(c, c.Vertical ? nh : nw));
+        });
+    }
+
+    static Geometry TornSeam(CutOutEdit c, int length)
+    {
+        var points = CutOutGeometry.TornBand(length)
+            .Select(p => c.Vertical ? new Point(c.Start + p.Y, p.X) : new Point(p.X, c.Start + p.Y)).ToArray();
+        var g = new StreamGeometry();
+        using (var ctx = g.Open())
+        {
+            ctx.BeginFigure(points[0], isFilled: true, isClosed: true);
+            ctx.PolyLineTo(points[1..], isStroked: false, isSmoothJoin: false);
+        }
+        g.Freeze();
+        return g;
+    }
 
     static BitmapSource Draw(int w, int h, string? background, BitmapScalingMode mode, Action<DrawingContext> draw)
     {

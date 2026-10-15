@@ -12,6 +12,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => x.Bounds,
         PenAnnotation x => PointsBounds(x.Points).Inflate(x.Width),
         BlurAnnotation x => x.Bounds,
+        SpotlightAnnotation x => x.Bounds,
         MagnifyAnnotation x => MagnifyTarget(x),
         ImageAnnotation x => x.Bounds,
         StampAnnotation x => x.Bounds,
@@ -68,6 +69,7 @@ public static class AnnotationGeometry
         HighlightAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         PenAnnotation x => x with { Points = x.Points.Select(q => q.Offset(dx, dy)).ToArray() },
         BlurAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
+        SpotlightAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         MagnifyAnnotation x => x with { TargetCenter = x.TargetCenter.Offset(dx, dy) },
         ImageAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
         StampAnnotation x => x with { Bounds = x.Bounds.Offset(dx, dy) },
@@ -81,6 +83,7 @@ public static class AnnotationGeometry
         CalloutAnnotation x => BottomRight(x.Bounds),
         HighlightAnnotation x => BottomRight(x.Bounds),
         BlurAnnotation x => BottomRight(x.Bounds),
+        SpotlightAnnotation x => BottomRight(x.Bounds),
         MagnifyAnnotation x => BottomRight(MagnifyTarget(x)),
         ImageAnnotation x => BottomRight(x.Bounds),
         StampAnnotation x => BottomRight(x.Bounds),
@@ -104,6 +107,7 @@ public static class AnnotationGeometry
         CalloutAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         HighlightAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         BlurAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
+        SpotlightAnnotation x => x with { Bounds = Grow(x.Bounds, p) },
         ImageAnnotation x => x with { Bounds = KeepAspect(x.Bounds, p) },
         StampAnnotation x => x with { Bounds = KeepAspect(x.Bounds, p) },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(2 * (p.X - x.TargetCenter.X) / Math.Max(1, x.SourceBounds.W), 1.5, 4) },
@@ -136,7 +140,7 @@ public static class AnnotationGeometry
         PenAnnotation x => x with { Color = s.Color, Width = s.Width },
         StampAnnotation x => x with { Color = s.Color },
         _ => a,
-    }) with { Shadow = a is BlurAnnotation or HighlightAnnotation ? false : s.Shadow };
+    }) with { Shadow = a is BlurAnnotation or HighlightAnnotation or SpotlightAnnotation ? false : s.Shadow };
 
     public static double StepSize(double fontSize) => Math.Max(24, fontSize * 1.6);
 
@@ -158,6 +162,7 @@ public static class AnnotationGeometry
     public static Annotation WithOptions(Annotation a, ToolOptions o) => a switch
     {
         BlurAnnotation x => x with { Mode = o.Blur, Strength = Math.Clamp(o.BlurStrength, 1, 20) },
+        SpotlightAnnotation x => x with { Shape = o.Spot, Dim = Math.Clamp(o.SpotDim, 0, 90), Blur = o.SpotBlur },
         MagnifyAnnotation x => x with { Zoom = Math.Clamp(o.Zoom, 1.5, 4), Shape = o.Lens },
         StepAnnotation x => x with { Style = o.Steps },
         _ => a,
@@ -166,6 +171,7 @@ public static class AnnotationGeometry
     public static ToolOptions OptionsOf(Annotation a, ToolOptions fallback) => a switch
     {
         BlurAnnotation x => fallback with { Blur = x.Mode, BlurStrength = x.Strength },
+        SpotlightAnnotation x => fallback with { Spot = x.Shape, SpotDim = x.Dim, SpotBlur = x.Blur },
         MagnifyAnnotation x => fallback with { Zoom = x.Zoom, Lens = x.Shape },
         StepAnnotation x => fallback with { Steps = x.Style },
         _ => fallback,
