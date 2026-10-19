@@ -28,6 +28,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add(_stop);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Open editor", null, (_, _) => app.ShowEditor());
+        menu.Items.Add("Library", null, (_, _) => app.ShowLibrary());
         menu.Items.Add("Open image…", null, (_, _) => app.OpenImageFromDialog());
         menu.Items.Add("Settings…", null, (_, _) => app.ShowSettings());
         menu.Items.Add(new Forms.ToolStripSeparator());

@@ -23,6 +23,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Record video** of a region to MP4 with system audio and microphone.
 - **Trim videos and make GIFs**: after recording (or from the recents strip) trim the start and end, remove parts from the middle, and save a new MP4 or an animated GIF (uses your ffmpeg).
 - Every capture is saved automatically as a `.snapr` file and shown in the recents strip.
+- **Library** (toolbar, tray or Ctrl+L): every capture and video, grouped by month, with search (names, window titles, tags), kind and tag filters; tag captures, open them, show them in their folder or move them to the Recycle Bin.
 - **Open Snagit captures**: `.snagx` files open as editable Snapr captures (Open image…, drag onto the editor, or `Snapr.exe --open file.snagx`). The `.snagx` is never changed; anything Snapr has to approximate is listed in a banner.
 - **Export** to PNG, JPG, GIF, BMP or PDF, and **print** fitted to the page or at actual size.
 

@@ -18,7 +18,7 @@ public sealed record DocumentState(IReadOnlyList<Annotation> Annotations, Rct? C
     public IReadOnlyList<ImageEdit> Edits { get; init; } = [];
 }
 
-public sealed record CaptureMeta(DateTimeOffset CapturedAt, CaptureKind Kind, string? SourceTitle);
+public sealed record CaptureMeta(DateTimeOffset CapturedAt, CaptureKind Kind, string? SourceTitle, IReadOnlyList<string>? Tags = null);
 
 public sealed class CaptureDocument
 {
@@ -27,6 +27,6 @@ public sealed class CaptureDocument
     public required int PixelWidth { get; init; }
     public required int PixelHeight { get; init; }
     public double Dpi { get; init; } = 96;
-    public required CaptureMeta Meta { get; init; }
+    public required CaptureMeta Meta { get; set; }
     public DocumentState State { get; set; } = DocumentState.Empty;
 }

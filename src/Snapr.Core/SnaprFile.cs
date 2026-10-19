@@ -1,8 +1,12 @@
 using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Snapr.Core.Interop;
 
 namespace Snapr.Core;
+
+public sealed record CaptureInfo(CaptureMeta Meta, int PixelWidth, int PixelHeight);
 
 /// <summary>.snapr = ZIP with document.json, base.png and thumbnail.png.</summary>
 public static class SnaprFile
@@ -64,6 +68,62 @@ public static class SnaprFile
     {
         using var zip = ZipFile.OpenRead(path);
         return Read(zip, "thumbnail.png");
+    }
+
+    /// <summary>Only document.json's meta and size, without reading the images (the Library, spec parity 13 §2).</summary>
+    public static CaptureInfo ReadInfo(string path)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(path);
+            using var json = JsonDocument.Parse(Read(zip, "document.json"));
+            var root = json.RootElement;
+            if (!root.TryGetProperty("meta", out var m) || m.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("document.json has no meta.");
+            var meta = m.Deserialize<CaptureMeta>(SnaprJson.Options) ?? throw new InvalidDataException("document.json has no meta.");
+            return new CaptureInfo(meta, root.GetProperty("pixelWidth").GetInt32(), root.GetProperty("pixelHeight").GetInt32());
+        }
+        catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            throw new InvalidDataException("document.json is not valid.", ex);
+        }
+    }
+
+    /// <summary>Replaces meta.tags only: every other entry is copied byte for byte and every other JSON field is kept.
+    /// Written to a temp file and moved over the original, so a failure leaves the original untouched.</summary>
+    public static void SetTags(string path, IReadOnlyList<string> tags)
+    {
+        var tmp = path + ".tmp";
+        try
+        {
+            File.Delete(tmp);
+            using (var check = ZipFile.OpenRead(path))
+                if (check.GetEntry("document.json") is null) throw new InvalidDataException("document.json is missing.");
+            using (var src = ZipFile.OpenRead(path))
+            using (var dst = ZipFile.Open(tmp, ZipArchiveMode.Create))
+            {
+                foreach (var entry in src.Entries)
+                {
+                    var data = Read(src, entry.FullName);
+                    if (entry.FullName == "document.json")
+                    {
+                        JsonObject root;
+                        try { root = JsonNode.Parse(data) as JsonObject ?? throw new InvalidDataException("document.json is not valid."); }
+                        catch (JsonException ex) { throw new InvalidDataException("document.json is not valid.", ex); }
+                        var meta = root["meta"] as JsonObject ?? throw new InvalidDataException("document.json has no meta.");
+                        meta["tags"] = new JsonArray(tags.Select(t => (JsonNode?)JsonValue.Create(t)).ToArray());
+                        data = Encoding.UTF8.GetBytes(root.ToJsonString(SnaprJson.Options));
+                    }
+                    Write(dst, entry.FullName, data);
+                }
+            }
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(tmp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            throw;
+        }
     }
 
     static byte[] Read(ZipArchive zip, string name)

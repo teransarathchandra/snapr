@@ -124,6 +124,40 @@ public partial class EditorWindow : Window
     /// <summary>True when the editor is showing this saved file, so reloading it from disk would drop pending edits.</summary>
     public bool IsShowing(string fullPath) => _path is not null && string.Equals(_path, fullPath, StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Library delete of the capture a closed (hidden) editor still holds: saves, then drops the document so the file can go.
+    /// False when the editor is visible, shows another file, or couldn't save.</summary>
+    public bool ReleaseIfHidden(string fullPath)
+    {
+        if (!IsShowing(fullPath) || IsVisible || !FlushAutosave()) return false;
+        _doc = null;
+        _path = null;
+        _base = null;
+        _undo = null;
+        _dirty = false;
+        TitleText.Text = "";
+        SaveBanner.Visibility = Visibility.Collapsed;
+        InfoBanner.Visibility = Visibility.Collapsed;
+        _magnifierNotice = false;
+        Board.Select(null);
+        Board.ClearPixelSelection();
+        UpdateEmptyState();
+        UpdateUndoButtons();
+        BuildProps();
+        return true;
+    }
+
+    void Library_Click(object sender, RoutedEventArgs e) => _app.ShowLibrary();
+
+    /// <summary>Library tagging (spec parity 13 §4): the open capture's tags change in memory and are saved now, so autosave can't
+    /// write the old ones back. Null when <paramref name="fullPath"/> isn't the open capture.</summary>
+    public bool? TrySetTags(string fullPath, IReadOnlyList<string> tags)
+    {
+        if (_doc is null || !IsShowing(fullPath)) return null;
+        _doc.Meta = _doc.Meta with { Tags = tags };
+        _dirty = true;
+        return SaveNow();
+    }
+
     /// <summary>Shows the current capture, or the most recent saved one, or the empty state.</summary>
     public void ShowLatest()
     {
@@ -872,6 +906,7 @@ public partial class EditorWindow : Window
                 break;
             case EditorCommand.Group: Group(); break;
             case EditorCommand.Ungroup: Ungroup(); break;
+            case EditorCommand.Library: _app.ShowLibrary(); break;
         }
     }
 

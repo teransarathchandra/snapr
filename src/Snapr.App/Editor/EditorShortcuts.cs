@@ -2,7 +2,7 @@ using System.Windows.Input;
 
 namespace Snapr.App.Editor;
 
-public enum EditorCommand { Undo, Redo, Copy, Cut, Paste, Delete, Deselect, SaveNow, SaveAsImage, Open, NewFromClipboard, Close, Print, ZoomIn, ZoomOut, ZoomFit, SelectAll, Group, Ungroup }
+public enum EditorCommand { Undo, Redo, Copy, Cut, Paste, Delete, Deselect, SaveNow, SaveAsImage, Open, NewFromClipboard, Close, Print, ZoomIn, ZoomOut, ZoomFit, SelectAll, Group, Ungroup, Library }
 
 /// <summary>Editor keyboard shortcuts (spec addendum §2). Unmodified letters are tool keys and are handled by the window.</summary>
 public static class EditorShortcuts
@@ -30,6 +30,7 @@ public static class EditorShortcuts
         (Ctrl, Key.A) => EditorCommand.SelectAll,
         (Ctrl | Shift, Key.G) => EditorCommand.Group,
         (Ctrl | Shift, Key.U) => EditorCommand.Ungroup,
+        (Ctrl, Key.L) => EditorCommand.Library,
         _ => null,
     };
 

@@ -34,6 +34,7 @@ public class EditorShortcutsTests
     [InlineData(C, Key.A, EditorCommand.SelectAll)]
     [InlineData(C | S, Key.G, EditorCommand.Group)]
     [InlineData(C | S, Key.U, EditorCommand.Ungroup)]
+    [InlineData(C, Key.L, EditorCommand.Library)]
     public void Maps_every_spec_shortcut(ModifierKeys modifiers, Key key, EditorCommand command) =>
         Assert.Equal(command, EditorShortcuts.Resolve(modifiers, key));
 
