@@ -8,6 +8,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Capture** a region, a window or every screen, with a magnifier, size readout and optional delay.
 - **Annotate** with arrows, text, callouts, shapes, pen, highlighter, numbered steps, blur or pixelate, magnifier, crop and eraser. Every object stays editable; undo goes back 100 steps.
 - **Work with several objects**: select with a box, Shift+click or Ctrl+A; move, nudge with the arrow keys, copy, delete, group (Ctrl+Shift+G), align and distribute them. Paste (Ctrl+V) or drop pictures onto a capture to add them as movable images.
+- **Combine images**: Ctrl+click two or more captures in the recents strip, then **Combine** to place them side by side, stacked or in a grid on a new capture; each one stays a movable picture.
 - **Cut out** a horizontal or vertical strip from the middle of a capture with a straight or torn join (Cut out tool, U); it is an image edit, so undo and Revert to original image bring it back.
 - **Select pixels** (Selection tool, R): drag a rectangle, then drag it to move those pixels, Delete to clear, Ctrl+C / Ctrl+X to copy or cut, or crop to it; the gap is filled with the most common colour along the selection's edge, or a colour you choose.
 - **Spotlight** areas (rectangle or ellipse): everything else is dimmed and can be blurred (Spotlight tool, L).

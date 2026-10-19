@@ -14,6 +14,7 @@ using Snapr.App.Dialogs;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
+using Snapr.Core.Interop;
 using Snapr.Core.Output;
 
 namespace Snapr.App.Editor;
@@ -33,6 +34,8 @@ public partial class EditorWindow : Window
     ];
 
     readonly AppController _app;
+    readonly PickList _picks = new();
+    CombineChoice _combineChoice = CombineChoice.Default;
     readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly Dictionary<ToolKind, RadioButton> _toolButtons = new();
     CaptureDocument? _doc;
@@ -581,7 +584,20 @@ public partial class EditorWindow : Window
     public void RefreshRecents()
     {
         RecentsList.Items.Clear();
-        foreach (var item in RecentsIndex.List([CapturePaths.PicturesRoot, CapturePaths.VideosRoot]))
+        var items = RecentsIndex.List([CapturePaths.PicturesRoot, CapturePaths.VideosRoot]).ToList();
+        _picks.Retain(_picks.Paths.Where(File.Exists));
+        if (_picks.Count >= 2)
+        {
+            var bar = new StackPanel { Margin = new Thickness(4, 10, 4, 10), VerticalAlignment = VerticalAlignment.Center };
+            var combine = new Button { Content = $"Combine ({_picks.Count})…", Style = (Style)FindResource("AccentButton") };
+            combine.Click += Combine_Click;
+            var clear = new Button { Content = "Clear", Margin = new Thickness(0, 4, 0, 0) };
+            clear.Click += (_, _) => { _picks.Clear(); RefreshRecents(); };
+            bar.Children.Add(combine);
+            bar.Children.Add(clear);
+            RecentsList.Items.Add(bar);
+        }
+        foreach (var item in items)
         {
             UIElement content;
             if (item.IsVideo)
@@ -608,17 +624,108 @@ public partial class EditorWindow : Window
                 }
             }
             var current = string.Equals(item.Path, _path, StringComparison.OrdinalIgnoreCase);
+            var picked = !item.IsVideo && _picks.NumberOf(item.Path) is > 0 and var n ? n : 0;
+            if (picked > 0)
+            {
+                content = new Grid
+                {
+                    Children =
+                    {
+                        content,
+                        new Border
+                        {
+                            Background = (Brush)FindResource("AccentFillBrush"), CornerRadius = new CornerRadius(9), MinWidth = 18, Margin = new Thickness(2),
+                            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
+                            Child = new TextBlock { Text = picked.ToString(), Foreground = Brushes.White, FontSize = 11, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center },
+                        },
+                    },
+                };
+            }
             var button = new Button
             {
                 Content = content, Padding = new Thickness(2), Margin = new Thickness(4, 10, 4, 10),
                 ToolTip = Path.GetFileName(item.Path),
-                BorderBrush = current ? (Brush)FindResource("AccentBrush") : Brushes.Transparent,
-                BorderThickness = new Thickness(current ? 2 : 0),
+                BorderBrush = current || picked > 0 ? (Brush)FindResource("AccentBrush") : Brushes.Transparent,
+                BorderThickness = new Thickness(picked > 0 ? 3 : current ? 2 : 0),
             };
-            AutomationProperties.SetName(button, Path.GetFileName(item.Path));
-            button.Click += (_, _) => OpenRecent(item);
+            AutomationProperties.SetName(button, picked > 0 ? $"{Path.GetFileName(item.Path)}, picked {picked}" : Path.GetFileName(item.Path));
+            button.Click += (_, _) => TileClick(item);
             RecentsList.Items.Add(button);
         }
+    }
+
+    void TileClick(RecentItem item)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            if (item.IsVideo) return;
+            if (!_picks.Toggle(item.Path)) ShowNotice("You can combine up to 20 captures.");
+            RefreshRecents();
+            return;
+        }
+        if (_picks.Count > 0)
+        {
+            _picks.Clear();
+            RefreshRecents();
+        }
+        OpenRecent(item);
+    }
+
+    void Combine_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CombineWindow(this, Swatches, _combineChoice);
+        if (dialog.ShowDialog() != true || dialog.Result is not { } choice) return;
+        _combineChoice = choice;
+        Board.CommitTextEditor();
+        if (_doc is not null && !FlushAutosave())
+        {
+            MessageBox.Show(this, "Snapr couldn't save the open capture, so it can't be combined yet.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var pictures = new List<BitmapSource>();
+        var skipped = new List<string>();
+        var tooLarge = false;
+        long area = 0;
+        foreach (var path in _picks.Paths)
+        {
+            try
+            {
+                var picture = CombineService.Flatten(SnaprFile.Load(path));
+                pictures.Add(picture);
+                area += (long)picture.PixelWidth * picture.PixelHeight;
+            }
+            catch (OutOfMemoryException ex)
+            {
+                Log.Write($"Combine ran out of memory on {path}", ex);
+                tooLarge = true;
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException or FormatException)
+            {
+                Log.Write($"Combine skipped {path}", ex);
+                skipped.Add(Path.GetFileName(path));
+            }
+            if (tooLarge || area > SnagxReader.MaxTotalPixels) { tooLarge = true; break; }
+        }
+        if (tooLarge)
+        {
+            MessageBox.Show(this, "The combined image would be too large.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (pictures.Count < 2)
+        {
+            MessageBox.Show(this, "Snapr needs at least two readable captures to combine.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (CombineService.Build(pictures, choice) is not { } output)
+        {
+            MessageBox.Show(this, "The combined image would be too large.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _picks.Clear();
+        _app.OpenNewCapture(output.Base, CaptureKind.Region, "Combined", annotations: output.Objects,
+            notice: skipped.Count > 0 ? "Skipped (couldn't read): " + string.Join(", ", skipped) : null);
+        SetTool(ToolKind.Move);
+        RefreshRecents();
     }
 
     void OpenRecent(RecentItem item)
