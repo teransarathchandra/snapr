@@ -43,10 +43,74 @@ public sealed class EditorCanvas : Canvas
     public event Action<DocumentState, string?>? Committed;
     public event Action? SelectionChanged;
     public event Action<string>? Message;
+    /// <summary>A note for the editor's info banner.</summary>
+    public event Action<string>? Notice;
     public bool CutVertical { get; set; }
     public CutJoin CutJoin { get; set; } = CutJoin.Torn;
 
-    public ToolKind Tool { get; set; } = ToolKind.Arrow;
+    ToolKind _tool = ToolKind.Arrow;
+    public ToolKind Tool
+    {
+        get => _tool;
+        set
+        {
+            if (value != ToolKind.Selection) SetPixelSelection(null);
+            _tool = value;
+        }
+    }
+
+    Rct? _pixelSelection;
+    bool _movingPixels;
+    (int Dx, int Dy) _pixelOffset;
+    uint _moveFillArgb;
+
+    /// <summary>The Selection tool's pixel rectangle in image pixels, or null.</summary>
+    public Rct? PixelSelection => _pixelSelection;
+    /// <summary>Colour that fills the gap left by moving or clearing pixels; null = the surrounding colour.</summary>
+    public string? GapFill { get; set; }
+    public event Action? PixelSelectionChanged;
+
+    void SetPixelSelection(Rct? r)
+    {
+        if (_pixelSelection == r) return;
+        _pixelSelection = r;
+        PixelSelectionChanged?.Invoke();
+        InvalidateVisual();
+    }
+
+    public void ClearPixelSelection() => SetPixelSelection(null);
+
+    bool _ownEdit;   // committing our own pixel edit: the selection survives the image change
+
+    void CommitOwn(DocumentState next)
+    {
+        _ownEdit = true;
+        try { Commit(next); }
+        finally { _ownEdit = false; }
+    }
+
+    (int W, int H) ImageSize => (_base!.PixelWidth, _base.PixelHeight);
+
+    public bool ClearSelectedPixels()
+    {
+        if (_base is null || _pixelSelection is not { } sel) return false;
+        CommitOwn(_state.ApplyEdit(ImageSize, new ClearAreaEdit(sel, GapFill)));
+        return true;
+    }
+
+    /// <summary>What is visible inside the selection (image plus objects such as redaction covers, no effects), or null with no selection.</summary>
+    public BitmapSource? SelectedPixels() =>
+        _base is null || _pixelSelection is not { } s ? null : DocumentRenderer.Render(_base, _state with { Crop = s }, applyEffects: false);
+
+    public void CropToPixelSelection()
+    {
+        if (_base is null || _pixelSelection is not { } sel) return;
+        Commit(_state.SetCrop(sel, _base.PixelWidth, _base.PixelHeight));
+        SetPixelSelection(null);
+    }
+
+    uint MoveFill(Rct sel) =>
+        GapFill is not null && ColorText.TryArgb(GapFill, out var argb) ? argb : PixelEdits.EdgeColour(ImageIo.ToFrame(_base!), sel);
     public StampChoice Stamp { get; set; } = StampChoice.Default;
     public ToolStyle CurrentStyle { get; set; } = ToolStyle.Default;
     public ToolOptions Options { get; set; } = ToolOptions.Default;
@@ -70,6 +134,7 @@ public sealed class EditorCanvas : Canvas
     {
         CancelTextEditor();
         _base = baseImage;
+        SetPixelSelection(null);
         _selected = [];
         SetState(state);
         SelectionChanged?.Invoke();
@@ -78,6 +143,7 @@ public sealed class EditorCanvas : Canvas
     /// <summary>Replaces the image under the objects (after an image edit, undo or redo) without touching the selection.</summary>
     public void SetImage(BitmapSource image)
     {
+        if (!ReferenceEquals(_base, image) && !_ownEdit) SetPixelSelection(null);   // undo/redo clear it from the window
         _base = image;
         InvalidateMeasure();
         InvalidateVisual();
@@ -160,6 +226,7 @@ public sealed class EditorCanvas : Canvas
         if (_cropDrag is { } c) DrawCropPreview(dc, c);
         if (_cutDrag is { } cut) DrawCutPreview(dc, cut);
         if (_box is { } box) dc.DrawRectangle(BoxFill, new Pen(Accent, 1 / Zoom) { DashStyle = DashStyles.Dash }, ToRect(box));
+        DrawPixelSelection(dc);
         DrawSelection(dc, state);
         dc.Pop();
         dc.Pop();
@@ -172,6 +239,30 @@ public sealed class EditorCanvas : Canvas
             new RectangleGeometry(new Rect(v.X, v.Y, v.W, v.H)), new RectangleGeometry(new Rect(c.X, c.Y, c.W, c.H)));
         dc.DrawGeometry(CropDim, null, outside);
         dc.DrawRectangle(null, new Pen(Accent, 2 / Zoom), new Rect(c.X, c.Y, c.W, c.H));
+    }
+
+    void DrawPixelSelection(DrawingContext dc)
+    {
+        if (Tool != ToolKind.Selection || _pixelSelection is not { } sel) return;
+        var shown = sel;
+        if (_movingPixels)
+        {
+            // Gap fill over the source, then the selected pixels at the new spot. A transparent fill shows as grey here.
+            var fill = _moveFillArgb >> 24 == 0 ? Color.FromArgb(0x80, 0x80, 0x80, 0x80)
+                : Color.FromArgb((byte)(_moveFillArgb >> 24), (byte)(_moveFillArgb >> 16), (byte)(_moveFillArgb >> 8), (byte)_moveFillArgb);
+            dc.DrawRectangle(new SolidColorBrush(fill), null, ToRect(sel));
+            shown = sel.Offset(_pixelOffset.Dx, _pixelOffset.Dy);
+            var piece = new CroppedBitmap(_base!, new Int32Rect((int)sel.X, (int)sel.Y, (int)sel.W, (int)sel.H));
+            dc.DrawImage(piece, ToRect(shown));
+        }
+        var r = ToRect(shown);
+        dc.DrawRectangle(null, new Pen(Brushes.White, 1 / Zoom), r);
+        dc.DrawRectangle(null, new Pen(Brushes.Black, 1 / Zoom) { DashStyle = DashStyles.Dash }, r);
+        var label = new FormattedText($"{(int)shown.W} × {(int)shown.H}", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface("Segoe UI"), 12 / Zoom, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var at = new Point(r.X, Math.Max(View.Y, r.Y - label.Height - 2 / Zoom));
+        dc.DrawRectangle(CropDim, null, new Rect(at, new Size(label.Width, label.Height)));
+        dc.DrawText(label, at);
     }
 
     void DrawCutPreview(DrawingContext dc, (int Start, int End) cut)
@@ -271,6 +362,15 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.Pen:
                 _pen = [p];
                 break;
+            case ToolKind.Selection:
+                if (_pixelSelection is { } sel && sel.Contains(p))
+                {
+                    _movingPixels = true;
+                    _pixelOffset = (0, 0);
+                    _moveFillArgb = MoveFill(sel);
+                }
+                else SetPixelSelection(null);
+                break;
         }
         CaptureMouse();
     }
@@ -306,6 +406,15 @@ public sealed class EditorCanvas : Canvas
                 break;
             case ToolKind.CutOut:
                 _cutDrag = IsClick(p) ? null : Strip(_down, p);
+                break;
+            case ToolKind.Selection when _movingPixels:
+                int dx = (int)Math.Round(p.X - _down.X), dy = (int)Math.Round(p.Y - _down.Y);
+                if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) { if (Math.Abs(dx) >= Math.Abs(dy)) dy = 0; else dx = 0; }
+                _pixelOffset = (dx, dy);
+                break;
+            case ToolKind.Selection:
+                var drag = SelectionRect.FromDrag(_down, p, _base.PixelWidth, _base.PixelHeight)?.Intersect(View);   // only what is visible
+                SetPixelSelection(drag is { W: >= 2, H: >= 2 } ? drag : null);
                 break;
             case ToolKind.Move or ToolKind.Step or ToolKind.Eraser or ToolKind.Pen or ToolKind.Fill:
                 break;
@@ -366,6 +475,20 @@ public sealed class EditorCanvas : Canvas
                     else Commit(next);
                 }
                 break;
+            case ToolKind.Selection:
+                if (_movingPixels && _pixelSelection is { } sel && _pixelOffset != (0, 0))
+                {
+                    var (dx, dy) = _pixelOffset;
+                    _movingPixels = false;   // before Commit: the window's ShowState clears the selection, which is then re-set below
+                    var next = _state.ApplyEdit(ImageSize, new MovePixelsEdit(sel, dx, dy, GapFill));
+                    if (ReferenceEquals(next, _state)) break;   // refused (e.g. the edit cap): nothing moved, the selection stays
+                    CommitOwn(next);
+                    var moved = sel.Offset(dx, dy).Intersect(new Rct(0, 0, _base!.PixelWidth, _base.PixelHeight));
+                    SetPixelSelection(moved.IsEmpty ? null : moved);
+                    if (PixelEdits.TouchesObjects(sel, next.Annotations))
+                        Notice?.Invoke("Moved pixels don't take objects with them. Check that redaction covers and arrows still cover what they should.");
+                }
+                break;
             default:
                 if (AnnotationFactory.FromDrag(Tool, _down, p, CurrentStyle, Options) is { } a)
                 {
@@ -422,6 +545,7 @@ public sealed class EditorCanvas : Canvas
         _pen = null;
         _cropDrag = null;
         _cutDrag = null;
+        _movingPixels = false;
         InvalidateVisual();
     }
 

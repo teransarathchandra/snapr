@@ -1,6 +1,6 @@
 namespace Snapr.Core;
 
-public enum ToolKind { Move, Arrow, Text, Callout, Shape, Pen, Highlight, Step, Blur, Magnify, Crop, Eraser, Fill, Stamp, CutOut, Spotlight }
+public enum ToolKind { Move, Arrow, Text, Callout, Shape, Pen, Highlight, Step, Blur, Magnify, Crop, Eraser, Fill, Stamp, CutOut, Spotlight, Selection }
 
 public enum ShapeOption { Rectangle, Ellipse, Line }
 

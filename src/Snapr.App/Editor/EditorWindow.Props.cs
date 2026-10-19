@@ -229,6 +229,14 @@ public partial class EditorWindow
             SliderRow("Tolerance", 0, 100, options.FillTolerance, v => ChangeOptions(o => o with { FillTolerance = (int)Math.Round(v) }, "tolerance"));
             Hint("Click the image to fill the touching area of similar colour. Objects are not changed.");
         }
+        if (kind == ToolKind.Selection)
+        {
+            ChoiceRow("Gap fill", [("Auto", (string?)null), ("Transparent", "#00000000")], Board.GapFill, v => { Board.GapFill = v; BuildProps(); });
+            SwatchRow(Board.GapFill ?? "#00000000", c => { Board.GapFill = c; BuildProps(); });
+            var crop = ButtonRow(("Crop to selection", Board.CropToPixelSelection))[0];
+            crop.IsEnabled = Board.PixelSelection is not null;
+            Hint("Drag to select. Drag inside to move. Delete clears, Ctrl+C copies, Ctrl+X cuts.");
+        }
         if (kind == ToolKind.Stamp && Board.Tool == ToolKind.Stamp) StampPicker(style.Color);
         if (kind == ToolKind.Crop)
         {
@@ -240,7 +248,7 @@ public partial class EditorWindow
             ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(selected.Id))),
                       ("Send to back", () => Board.Apply(s => s.SendToBack(selected.Id))),
                       ("Delete", Board.DeleteSelected));
-        else if (kind is not (ToolKind.Move or ToolKind.Crop or ToolKind.Eraser or ToolKind.CutOut or ToolKind.Spotlight))
+        else if (kind is not (ToolKind.Move or ToolKind.Crop or ToolKind.Eraser or ToolKind.CutOut or ToolKind.Spotlight or ToolKind.Selection))
             ButtonRow(("Save as quick style", () => { _app.SaveQuickStyle(Board.Tool, Board.CurrentStyle); _app.Notify("Quick style saved", $"{name} will start with this style."); }));
 
         EffectsProps();
@@ -418,15 +426,18 @@ public partial class EditorWindow
         PropsPanel.Children.Add(box);
     }
 
-    void ButtonRow(params (string Text, Action Click)[] buttons)
+    Button[] ButtonRow(params (string Text, Action Click)[] buttons)
     {
+        var made = new List<Button>();
         var row = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
         foreach (var (text, click) in buttons)
         {
             var b = new Button { Content = text, Margin = new Thickness(0, 0, 6, 6) };
             b.Click += (_, _) => { click(); Board.Focus(); };
             row.Children.Add(b);
+            made.Add(b);
         }
         PropsPanel.Children.Add(row);
+        return made.ToArray();
     }
 }

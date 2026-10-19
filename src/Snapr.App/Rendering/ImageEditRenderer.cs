@@ -18,6 +18,8 @@ public static class ImageEditRenderer
             dc => dc.DrawImage(image, new Rect(m.Left, m.Top, image.PixelWidth, image.PixelHeight))),
         FillEdit f when ColorText.TryArgb(f.Color, out var argb) =>
             ImageIo.FromFrame(FloodFill.Fill(ImageIo.ToFrame(image), f.X, f.Y, argb, f.Tolerance)),
+        MovePixelsEdit m => ImageIo.FromFrame(PixelEdits.Apply(ImageIo.ToFrame(image), m)),
+        ClearAreaEdit c => ImageIo.FromFrame(PixelEdits.Apply(ImageIo.ToFrame(image), c)),
         CutOutEdit c => Cut(image, c),
         _ => image,
     };

@@ -9,6 +9,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Annotate** with arrows, text, callouts, shapes, pen, highlighter, numbered steps, blur or pixelate, magnifier, crop and eraser. Every object stays editable; undo goes back 100 steps.
 - **Work with several objects**: select with a box, Shift+click or Ctrl+A; move, nudge with the arrow keys, copy, delete, group (Ctrl+Shift+G), align and distribute them. Paste (Ctrl+V) or drop pictures onto a capture to add them as movable images.
 - **Cut out** a horizontal or vertical strip from the middle of a capture with a straight or torn join (Cut out tool, U); it is an image edit, so undo and Revert to original image bring it back.
+- **Select pixels** (Selection tool, R): drag a rectangle, then drag it to move those pixels, Delete to clear, Ctrl+C / Ctrl+X to copy or cut, or crop to it; the gap is filled with the most common colour along the selection's edge, or a colour you choose.
 - **Spotlight** areas (rectangle or ellipse): everything else is dimmed and can be blurred (Spotlight tool, L).
 - **Stamps**: 25 built-in recolourable stamps (check, cross, warning, arrows, badges …) plus your own PNG stamps (Stamp tool, G).
 - **Edit the image**: rotate, flip, resize, add margins (Image ▾) and fill areas with colour (Fill tool, F). Objects follow, every change can be undone while you edit, and the original capture pixels are always kept in the file.

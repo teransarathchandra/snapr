@@ -11,6 +11,8 @@ namespace Snapr.Core;
 [JsonDerivedType(typeof(MarginsEdit), "margins")]
 [JsonDerivedType(typeof(FillEdit), "fill")]
 [JsonDerivedType(typeof(CutOutEdit), "cutout")]
+[JsonDerivedType(typeof(MovePixelsEdit), "movepixels")]
+[JsonDerivedType(typeof(ClearAreaEdit), "cleararea")]
 public abstract record ImageEdit;
 
 /// <summary>QuarterTurns: 1 = 90° right, 2 = 180°, 3 = 90° left.</summary>
@@ -32,6 +34,12 @@ public enum CutJoin { Straight, Torn }
 /// <summary>Removes a strip and closes the gap (spec parity 7 §2): columns [Start, End) when Vertical, otherwise rows.</summary>
 public sealed record CutOutEdit(bool Vertical, int Start, int End, CutJoin Join) : ImageEdit;
 
+/// <summary>Moves the pixels of Source by (Dx, Dy) and fills the hole (spec parity 9 §2). Fill null = Auto (edge colour).</summary>
+public sealed record MovePixelsEdit(Rct Source, int Dx, int Dy, string? Fill) : ImageEdit;
+
+/// <summary>Fills Area (spec parity 9 §2). Fill null = Auto (edge colour).</summary>
+public sealed record ClearAreaEdit(Rct Area, string? Fill) : ImageEdit;
+
 public static class ImageEditRules
 {
     public const int MaxEdits = 1_000;
@@ -39,6 +47,7 @@ public static class ImageEditRules
     public const long MaxPixels = 100_000_000;
     public const int MaxMargin = 4_000;
     public const int MinCutSide = 16;
+    public const int MaxPixelMove = 32_000;
 
     public static bool SizeOk(long w, long h) => w >= 1 && h >= 1 && w <= MaxSide && h <= MaxSide && w * h <= MaxPixels;
 
@@ -80,10 +89,20 @@ public static class ImageEditRules
         FillEdit f => f.X >= 0 && f.Y >= 0 && f.X < w && f.Y < h && f.Tolerance is >= 0 and <= 100 && ColorText.TryArgb(f.Color, out _),
         CutOutEdit c => c.Start >= 0 && c.End > c.Start && c.End <= (c.Vertical ? w : h)
             && (c.Vertical ? w : h) - (c.End - c.Start) >= MinCutSide && Enum.IsDefined(c.Join),
+        MovePixelsEdit m => PixelRect(m.Source, w, h) && (m.Dx != 0 || m.Dy != 0)
+            && Math.Abs(m.Dx) <= MaxPixelMove && Math.Abs(m.Dy) <= MaxPixelMove && FillOk(m.Fill),
+        ClearAreaEdit c => PixelRect(c.Area, w, h) && FillOk(c.Fill),
         _ => false,
     };
 
     static bool Margin(int v) => v is >= 0 and <= MaxMargin;
+
+    /// <summary>Whole pixels, at least 1 × 1, inside a w × h image.</summary>
+    static bool PixelRect(Rct r, int w, int h) =>
+        r.X == Math.Floor(r.X) && r.Y == Math.Floor(r.Y) && r.W == Math.Floor(r.W) && r.H == Math.Floor(r.H)
+        && r.W >= 1 && r.H >= 1 && r.X >= 0 && r.Y >= 0 && r.X + r.W <= w && r.Y + r.H <= h;
+
+    static bool FillOk(string? fill) => fill is null || ColorText.TryArgb(fill, out _);
 
     /// <summary>Height that keeps the proportions of w0 × h0 at width w (rounded, at least 1).</summary>
     public static int ProportionalHeight(int w0, int h0, int w) => Math.Max(1, (int)Math.Round((double)w * h0 / w0, MidpointRounding.AwayFromZero));

@@ -29,6 +29,7 @@ public partial class EditorWindow : Window
         (ToolKind.Stamp, "Stamp", Key.G),
         (ToolKind.CutOut, "Cut out", Key.U),
         (ToolKind.Spotlight, "Spotlight", Key.L),
+        (ToolKind.Selection, "Selection", Key.R),
     ];
 
     readonly AppController _app;
@@ -54,8 +55,15 @@ public partial class EditorWindow : Window
         LogoImage.Source = AppIcon.Render(40);
         _autosave.Tick += (_, _) => { _autosave.Stop(); SaveNow(); };
         Board.Committed += OnCommitted;
+        Board.Notice += ShowNotice;
         Board.Message += text => _app.Notify("Cut out", text);
         Board.SelectionChanged += BuildProps;
+        Board.PixelSelectionChanged += () =>
+        {
+            // The panel only shows whether a selection exists (Crop to selection), so skip the per-mouse-move rebuilds.
+            if ((Board.PixelSelection is not null) != _hadPixelSelection) BuildProps();
+            _hadPixelSelection = Board.PixelSelection is not null;
+        };
         CanvasScroller.SizeChanged += (_, _) => ApplyZoom();
         PreviewKeyDown += OnKey;
         BuildToolbar();
@@ -180,8 +188,8 @@ public partial class EditorWindow : Window
         ApplyZoom();
     }
 
-    void Undo() { if (_undo is { CanUndo: true }) { Board.CommitTextEditor(); _undo.Undo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
-    void Redo() { if (_undo is { CanRedo: true }) { _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
+    void Undo() { if (_undo is { CanUndo: true }) { Board.CommitTextEditor(); Board.ClearPixelSelection(); _undo.Undo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
+    void Redo() { if (_undo is { CanRedo: true }) { Board.ClearPixelSelection(); _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
 
     void UpdateUndoButtons()
     {
@@ -239,6 +247,23 @@ public partial class EditorWindow : Window
         if (ok) _pasteCount = 0;
         else MessageBox.Show(this, "Another app is holding the clipboard. Try again.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
         return ok;
+    }
+
+    bool _hadPixelSelection;
+
+    bool PixelSelectionActive => Board.Tool == ToolKind.Selection && Board.PixelSelection is not null;
+
+    /// <summary>Copies what is visible inside the selection (objects included, no effects).</summary>
+    bool CopyPixels()
+    {
+        if (Board.SelectedPixels() is not { } pixels) return false;
+        if (ClipboardImage.Set(pixels))
+        {
+            _app.Notify("Copied", "The selection is on the clipboard.");
+            return true;
+        }
+        MessageBox.Show(this, "Another app is holding the clipboard. Try again.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
     }
 
     void Cut()
@@ -665,6 +690,10 @@ public partial class EditorWindow : Window
         {
             case EditorCommand.Undo: Undo(); break;
             case EditorCommand.Redo: Redo(); break;
+            case EditorCommand.Copy when PixelSelectionActive: CopyPixels(); break;
+            case EditorCommand.Cut when PixelSelectionActive: if (CopyPixels()) Board.ClearSelectedPixels(); break;
+            case EditorCommand.Delete when PixelSelectionActive: Board.ClearSelectedPixels(); break;
+            case EditorCommand.Deselect when PixelSelectionActive: Board.ClearPixelSelection(); break;
             case EditorCommand.Copy: Copy(); break;
             case EditorCommand.Cut: Cut(); break;
             case EditorCommand.Paste: Paste(); break;

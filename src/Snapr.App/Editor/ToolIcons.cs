@@ -24,6 +24,7 @@ public static class ToolIcons
         [ToolKind.Eraser] = "M4,14 L11,7 L16,12 L11,17 H6 Z M8,10 L13,15",
         [ToolKind.Stamp] = "M7,3 H13 V8 L15,11 H5 L7,8 Z M3,13 H17 V16 H3 Z",
         [ToolKind.CutOut] = "M3,4 H17 M3,8 H17 M3,12 L5,14 L7,12 L9,14 L11,12 L13,14 L15,12 L17,14 M3,16 H17",
+        [ToolKind.Selection] = "M3,3 H6 M8,3 H12 M14,3 H17 V6 M17,8 V12 M17,14 V17 H14 M12,17 H8 M6,17 H3 V14 M3,12 V8 M3,6 V3",
         [ToolKind.Spotlight] = "M10,3 A7,7 0 1 1 9.99,3 Z M10,6.5 A3.5,3.5 0 1 1 9.99,6.5 Z",
         [ToolKind.Fill] = "M3,10 L9,4 L15,10 L9,16 Z M3,10 H15 M16,12 C17.5,14.5 18,15.5 16.8,16.6 C15.8,17.4 14.6,16 16,12 Z",
     };
