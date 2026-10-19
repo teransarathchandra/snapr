@@ -39,4 +39,7 @@ public class HotkeyGestureTests
         Assert.True(HotkeyGesture.TryParse(text, out var m, out var v));
         Assert.Equal((9u, 0x7Bu), (m, v));
     }
+
+    [Fact]
+    public void Panoramic_default_parses() => Assert.True(HotkeyGesture.TryParse("Ctrl+Alt+Shift+PrintScreen", out _, out _));
 }

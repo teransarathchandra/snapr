@@ -18,7 +18,8 @@ public static class SettingsStore
             // Only objects are inspected; any other shape is left for Deserialize to reject (JsonException → defaults).
             var given = (JsonNode.Parse(text) as JsonObject)?["hotkeys"] as JsonObject;
             return Normalize(JsonSerializer.Deserialize<AppSettings>(text, SnaprJson.Options) ?? new(),
-                repeatGiven: given?["repeatLastCapture"] is not null, pauseGiven: given?["videoPauseResume"] is not null);
+                repeatGiven: given?["repeatLastCapture"] is not null, pauseGiven: given?["videoPauseResume"] is not null,
+                panoramicGiven: given?["panoramicCapture"] is not null);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -36,7 +37,7 @@ public static class SettingsStore
     }
 
     /// <summary>A missing or null hotkey gets its default; an empty one stays empty (disabled).</summary>
-    static HotkeySettings Normalize(HotkeySettings? h, bool repeatGiven, bool pauseGiven)
+    static HotkeySettings Normalize(HotkeySettings? h, bool repeatGiven, bool pauseGiven, bool panoramicGiven, IEnumerable<string> presetKeys)
     {
         var d = new HotkeySettings();
         if (h is null) return d;
@@ -47,18 +48,26 @@ public static class SettingsStore
         string[] v1 = [image, video, scroll];
         string Fill(string? value, bool given, string def) =>
             given ? value ?? def : v1.Contains(def, StringComparer.OrdinalIgnoreCase) ? "" : def;
-        return new(image, video, scroll, Fill(h.RepeatLastCapture, repeatGiven, d.RepeatLastCapture), Fill(h.VideoPauseResume, pauseGiven, d.VideoPauseResume));
+        var repeat = Fill(h.RepeatLastCapture, repeatGiven, d.RepeatLastCapture);
+        var pause = Fill(h.VideoPauseResume, pauseGiven, d.VideoPauseResume);
+        var panoramic = panoramicGiven ? h.PanoramicCapture ?? d.PanoramicCapture
+            : new[] { image, video, scroll, repeat, pause }.Concat(presetKeys).Contains(d.PanoramicCapture, StringComparer.OrdinalIgnoreCase) ? "" : d.PanoramicCapture;
+        return new(image, video, scroll, repeat, pause, panoramic);
     }
 
-    static AppSettings Normalize(AppSettings s, bool repeatGiven, bool pauseGiven) => s with
+    static AppSettings Normalize(AppSettings s, bool repeatGiven, bool pauseGiven, bool panoramicGiven)
     {
-        Hotkeys = Normalize(s.Hotkeys, repeatGiven, pauseGiven),
-        QuickStyles = s.QuickStyles ?? new(),
-        CaptureDelaySeconds = Math.Clamp(s.CaptureDelaySeconds, 0, 10),
-        JpgQuality = Math.Clamp(s.JpgQuality, 1, 100),
-        ExportFormat = s.ExportFormat is "jpg" ? "jpg" : "png",
-        Presets = CleanPresets(s.Presets),
-    };
+        var presets = CleanPresets(s.Presets);
+        return s with
+        {
+            Hotkeys = Normalize(s.Hotkeys, repeatGiven, pauseGiven, panoramicGiven, presets.Select(p => p.Hotkey).Where(k => k != "")),
+            QuickStyles = s.QuickStyles ?? new(),
+            CaptureDelaySeconds = Math.Clamp(s.CaptureDelaySeconds, 0, 10),
+            JpgQuality = Math.Clamp(s.JpgQuality, 1, 100),
+            ExportFormat = s.ExportFormat is "jpg" ? "jpg" : "png",
+            Presets = presets,
+        };
+    }
 
     /// <summary>A hand-edited file must not stop Snapr: nameless entries are dropped, the rest clamped, at most 20 kept.</summary>
     static IReadOnlyList<CapturePreset> CleanPresets(IReadOnlyList<CapturePreset>? presets) =>

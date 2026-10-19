@@ -77,4 +77,37 @@ public sealed class SettingsTests : IDisposable
         var h = SettingsStore.Load(PathOf("c.json")).Hotkeys;
         Assert.Equal(("Ctrl+Alt+PrintScreen", ""), (h.RepeatLastCapture, h.VideoPauseResume));
     }
+
+    [Fact]
+    public void Panoramic_hotkey_defaults_when_missing()
+    {
+        File.WriteAllText(PathOf("p1.json"), """{"hotkeys":{"imageCapture":"F9"}}""");
+        Assert.Equal("Ctrl+Alt+Shift+PrintScreen", SettingsStore.Load(PathOf("p1.json")).Hotkeys.PanoramicCapture);
+        Assert.Equal("Ctrl+Alt+Shift+PrintScreen", new HotkeySettings().PanoramicCapture);
+    }
+
+    [Fact]
+    public void Defaulted_panoramic_hotkey_that_collides_is_disabled()
+    {
+        File.WriteAllText(PathOf("p2.json"), """{"hotkeys":{"imageCapture":"Ctrl+Alt+Shift+PrintScreen"}}""");
+        Assert.Equal("", SettingsStore.Load(PathOf("p2.json")).Hotkeys.PanoramicCapture);
+    }
+
+    [Fact]
+    public void Defaulted_panoramic_hotkey_that_collides_with_a_preset_is_disabled()
+    {
+        File.WriteAllText(PathOf("p5.json"), """{"presets":[{"name":"Wide","hotkey":"Ctrl+Alt+Shift+PrintScreen"}]}""");
+        var s = SettingsStore.Load(PathOf("p5.json"));
+        Assert.Equal("", s.Hotkeys.PanoramicCapture);
+        Assert.Equal("Ctrl+Alt+Shift+PrintScreen", Assert.Single(s.Presets).Hotkey);
+    }
+
+    [Fact]
+    public void Given_panoramic_hotkey_is_kept_and_empty_means_disabled()
+    {
+        File.WriteAllText(PathOf("p3.json"), """{"hotkeys":{"panoramicCapture":"F7"}}""");
+        Assert.Equal("F7", SettingsStore.Load(PathOf("p3.json")).Hotkeys.PanoramicCapture);
+        File.WriteAllText(PathOf("p4.json"), """{"hotkeys":{"panoramicCapture":""}}""");
+        Assert.Equal("", SettingsStore.Load(PathOf("p4.json")).Hotkeys.PanoramicCapture);
+    }
 }

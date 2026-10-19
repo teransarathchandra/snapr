@@ -1,6 +1,6 @@
 namespace Snapr.Core;
 
-public enum CaptureKind { Region, Window, Fullscreen, Scrolling, Clipboard, Imported }
+public enum CaptureKind { Region, Window, Fullscreen, Scrolling, Clipboard, Imported, Panoramic }
 
 public sealed record BorderEffect(string Color, int Width);
 

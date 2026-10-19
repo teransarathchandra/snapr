@@ -18,6 +18,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Effects**: border, drop shadow and torn edge.
 - **Grab Text** (OCR) from any part of the screen, using the OCR engine built into Windows.
 - **Scrolling capture** of long pages.
+- **Panoramic capture**: choose an area, then scroll, drag or pan the content yourself in any direction; Snapr follows and stitches it into one image (tray menu or Ctrl+Alt+Shift+Print Screen).
 - **Capture presets**: save a target (choose area, screen under the mouse, all screens or a fixed area), delay, action (edit, copy, grab text, save to a folder) and an optional hotkey; run them from Settings, the tray or the hotkey.
 - **Record video** of a region to MP4 with system audio and microphone.
 - **Trim videos and make GIFs**: after recording (or from the recents strip) trim the start and end, remove parts from the middle, and save a new MP4 or an animated GIF (uses your ffmpeg).

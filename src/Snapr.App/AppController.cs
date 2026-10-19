@@ -81,6 +81,7 @@ public sealed partial class AppController : IDisposable
         Register(_settings.Hotkeys.ImageCapture, () => CaptureImageAsync());
         Register(_settings.Hotkeys.VideoCapture, ToggleRecordingAsync);
         Register(_settings.Hotkeys.ScrollingCapture, ScrollingCaptureAsync);
+        Register(_settings.Hotkeys.PanoramicCapture, PanoramicCaptureAsync);
         Register(_settings.Hotkeys.RepeatLastCapture, RepeatLastCaptureAsync);
         Register(_settings.Hotkeys.VideoPauseResume, PauseResumeRecordingAsync);
         foreach (var preset in _settings.Presets) Register(preset.Hotkey, () => RunPresetAsync(preset));

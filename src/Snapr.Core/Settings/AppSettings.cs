@@ -6,7 +6,8 @@ public sealed record HotkeySettings(
     string VideoCapture = "Shift+PrintScreen",
     string ScrollingCapture = "Ctrl+PrintScreen",
     string RepeatLastCapture = "Ctrl+Alt+PrintScreen",
-    string VideoPauseResume = "Ctrl+Shift+PrintScreen");
+    string VideoPauseResume = "Ctrl+Shift+PrintScreen",
+    string PanoramicCapture = "Ctrl+Alt+Shift+PrintScreen");
 
 public sealed record AppSettings
 {

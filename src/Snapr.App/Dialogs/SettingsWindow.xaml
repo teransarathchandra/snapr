@@ -14,7 +14,7 @@
     <TextBlock Text="Click a box and press the new key combination. Backspace clears it (no hotkey)." Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" Margin="0,0,0,8"/>
     <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition/></Grid.ColumnDefinitions>
-      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
       <TextBlock Text="Capture image" VerticalAlignment="Center"/>
       <TextBox x:Name="ImageHotkey" Grid.Column="1" Margin="0,4" IsReadOnly="True" PreviewKeyDown="Hotkey_KeyDown"/>
       <TextBlock Grid.Row="1" Text="Record video" VerticalAlignment="Center"/>
@@ -25,6 +25,8 @@
       <TextBox x:Name="RepeatHotkey" Grid.Row="3" Grid.Column="1" Margin="0,4" IsReadOnly="True" PreviewKeyDown="Hotkey_KeyDown"/>
       <TextBlock Grid.Row="4" Text="Start/pause video" VerticalAlignment="Center"/>
       <TextBox x:Name="PauseHotkey" Grid.Row="4" Grid.Column="1" Margin="0,4" IsReadOnly="True" PreviewKeyDown="Hotkey_KeyDown"/>
+      <TextBlock Grid.Row="5" Text="Panoramic capture" VerticalAlignment="Center"/>
+      <TextBox x:Name="PanoHotkey" Grid.Row="5" Grid.Column="1" Margin="0,4" IsReadOnly="True" PreviewKeyDown="Hotkey_KeyDown"/>
     </Grid>
 
     <TextBlock Text="CAPTURE" Style="{StaticResource SectionHeader}"/>

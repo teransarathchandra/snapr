@@ -30,6 +30,7 @@ public partial class SettingsWindow : Window
         ScrollHotkey.Text = s.Hotkeys.ScrollingCapture;
         RepeatHotkey.Text = s.Hotkeys.RepeatLastCapture;
         PauseHotkey.Text = s.Hotkeys.VideoPauseResume;
+        PanoHotkey.Text = s.Hotkeys.PanoramicCapture;
         DelaySlider.Value = s.CaptureDelaySeconds;
         CursorCheck.IsChecked = s.IncludeCursor;
         PngRadio.IsChecked = s.ExportFormat != "jpg";
@@ -77,7 +78,7 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>The app hotkeys as currently typed in this window (not yet saved), for clash checks.</summary>
-    HotkeySettings TypedHotkeys() => new(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text);
+    HotkeySettings TypedHotkeys() => new(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text);
 
     void AddPreset_Click(object sender, RoutedEventArgs e) => OpenEditor(null);
 
@@ -172,7 +173,7 @@ public partial class SettingsWindow : Window
 
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        var appKeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text }
+        var appKeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text }
             .Where(h => h.Length > 0).ToArray();   // empty = disabled
         var hotkeys = appKeys.Concat(_presets.Select(p => p.Hotkey).Where(h => h.Length > 0)).ToArray();
         if (hotkeys.Any(h => !HotkeyGesture.TryParse(h, out _, out _)))
@@ -188,7 +189,7 @@ public partial class SettingsWindow : Window
         var ffmpeg = FfmpegBox.Text.Trim();
         _app.UpdateSettings(_app.Settings with
         {
-            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text),
+            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text),
             CaptureDelaySeconds = (int)DelaySlider.Value,
             IncludeCursor = CursorCheck.IsChecked == true,
             ExportFormat = JpgRadio.IsChecked == true ? "jpg" : "png",

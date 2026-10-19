@@ -65,7 +65,7 @@ public sealed class RecordingBar : Window
         _timer.Tick += (_, _) => _time.Text = _elapsed.Elapsed.ToString(@"mm\:ss");
         _timer.Start();
         SourceInitialized += (_, _) => Native.ExcludeFromCapture(new WindowInteropHelper(this).Handle);
-        Loaded += (_, _) => Place();
+        Loaded += (_, _) => PlaceOutside(this, _area);
         Closed += (_, _) => _timer.Stop();
     }
 
@@ -77,18 +77,18 @@ public sealed class RecordingBar : Window
     }
 
     /// <summary>Above the area if there is room, else below, else inside its top-right corner. Screen pixels.</summary>
-    void Place()
+    internal static void PlaceOutside(Window bar, Rct area)
     {
-        var hwnd = new WindowInteropHelper(this).Handle;
-        var dpi = VisualTreeHelper.GetDpi(this);
-        int w = (int)(ActualWidth * dpi.DpiScaleX), h = (int)(ActualHeight * dpi.DpiScaleY);
-        var monitor = Forms.Screen.FromRectangle(new System.Drawing.Rectangle((int)_area.X, (int)_area.Y, (int)_area.W, (int)_area.H)).Bounds;
-        int x = (int)_area.X, y = (int)_area.Y - h - 8;
-        if (y < monitor.Top) y = (int)_area.Bottom + 8;
+        var hwnd = new WindowInteropHelper(bar).Handle;
+        var dpi = VisualTreeHelper.GetDpi(bar);
+        int w = (int)(bar.ActualWidth * dpi.DpiScaleX), h = (int)(bar.ActualHeight * dpi.DpiScaleY);
+        var monitor = Forms.Screen.FromRectangle(new System.Drawing.Rectangle((int)area.X, (int)area.Y, (int)area.W, (int)area.H)).Bounds;
+        int x = (int)area.X, y = (int)area.Y - h - 8;
+        if (y < monitor.Top) y = (int)area.Bottom + 8;
         if (y + h > monitor.Bottom)
         {
-            y = (int)_area.Y + 8;
-            x = (int)_area.Right - w - 8;
+            y = (int)area.Y + 8;
+            x = (int)area.Right - w - 8;
         }
         x = Math.Clamp(x, monitor.Left, Math.Max(monitor.Left, monitor.Right - w));
         Native.SetWindowPos(hwnd, Native.HWND_TOPMOST, x, y, 0, 0, Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);

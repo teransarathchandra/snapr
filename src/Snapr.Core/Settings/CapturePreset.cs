@@ -37,7 +37,7 @@ public static class PresetRules
 
     /// <summary>The app's own hotkeys that are switched on.</summary>
     public static IEnumerable<string> AppHotkeys(HotkeySettings h) =>
-        new[] { h.ImageCapture, h.VideoCapture, h.ScrollingCapture, h.RepeatLastCapture, h.VideoPauseResume }.Where(k => !string.IsNullOrEmpty(k));
+        new[] { h.ImageCapture, h.VideoCapture, h.ScrollingCapture, h.RepeatLastCapture, h.VideoPauseResume, h.PanoramicCapture }.Where(k => !string.IsNullOrEmpty(k));
 
     /// <summary>"name yyyy-MM-dd HH.mm.ss.ext", cleaned for Windows and numbered if taken.</summary>
     public static string FileName(string presetName, DateTime now, string ext, Func<string, bool> exists) =>

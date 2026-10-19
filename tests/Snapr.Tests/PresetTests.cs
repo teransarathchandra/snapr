@@ -61,7 +61,7 @@ public sealed class PresetTests : IDisposable
 
     [Fact]
     public void App_hotkeys_skip_disabled_ones() =>
-        Assert.Equal(["PrintScreen"], PresetRules.AppHotkeys(new HotkeySettings("PrintScreen", "", "", "", "")));
+        Assert.Equal(["PrintScreen"], PresetRules.AppHotkeys(new HotkeySettings("PrintScreen", "", "", "", "", "")));
 
     [Fact]
     public void At_most_20_presets()
@@ -125,4 +125,8 @@ public sealed class PresetTests : IDisposable
         File.WriteAllText(path, """{"presets":null}""");
         Assert.Empty(SettingsStore.Load(path).Presets);
     }
+
+    [Fact]
+    public void App_hotkeys_include_panoramic() =>
+        Assert.Contains("Ctrl+Alt+Shift+PrintScreen", PresetRules.AppHotkeys(new HotkeySettings()));
 }

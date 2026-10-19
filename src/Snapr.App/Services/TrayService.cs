@@ -19,6 +19,7 @@ public sealed class TrayService : IDisposable
         menu.Items.Add("Capture image", null, (_, _) => app.Fire(() => app.CaptureImageAsync()));
         menu.Items.Add("Record video", null, (_, _) => app.Fire(app.ToggleRecordingAsync));
         menu.Items.Add("Scrolling capture", null, (_, _) => app.Fire(app.ScrollingCaptureAsync));
+        menu.Items.Add("Panoramic capture", null, (_, _) => app.Fire(app.PanoramicCaptureAsync));
         menu.Items.Add("Grab text", null, (_, _) => app.Fire(() => app.CaptureImageAsync(OverlayAction.GrabText)));
         menu.Items.Add(_presets);
         _pause = new Forms.ToolStripMenuItem("Pause recording", null, (_, _) => app.TogglePause()) { Visible = false };
