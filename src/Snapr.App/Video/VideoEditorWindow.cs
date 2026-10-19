@@ -35,6 +35,7 @@ public sealed class VideoEditorWindow : Window
     readonly Button _cancel = new() { Content = "Cancel", Visibility = Visibility.Collapsed };
     readonly TextBlock _status = new() { Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap };
     readonly Stack<VideoCut> _undoStack = new(), _redoStack = new();
+    readonly StackPanel _editRow, _saveRow;
 
     string? _ffmpeg;
     VideoInfo? _info;
@@ -57,17 +58,17 @@ public sealed class VideoEditorWindow : Window
         var open = new Button { Content = "Open in default player" };
         open.Click += (_, _) => OpenDefault();
         var transport = Row(_play, _time, open);
-        var edit = Row(_remove, _undo, _redo);
-        var save = Row(_saveMp4, _saveGif, new TextBlock { Text = "Width", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, _width,
+        _editRow = Row(_remove, _undo, _redo);
+        _saveRow = Row(_saveMp4, _saveGif, new TextBlock { Text = "Width", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, _width,
             new TextBlock { Text = "FPS", VerticalAlignment = VerticalAlignment.Center }, _fps, _progress, _cancel);
 
         var root = new DockPanel { Margin = new Thickness(20) };
         var bottom = new StackPanel();
         bottom.Children.Add(transport);
         bottom.Children.Add(_timeline);
-        bottom.Children.Add(edit);
+        bottom.Children.Add(_editRow);
         bottom.Children.Add(new Border { Height = 8 });
-        bottom.Children.Add(save);
+        bottom.Children.Add(_saveRow);
         bottom.Children.Add(_status);
         DockPanel.SetDock(bottom, Dock.Bottom);
         root.Children.Add(bottom);
@@ -137,6 +138,9 @@ public sealed class VideoEditorWindow : Window
         _status.Text = _playFailed ? $"{text} Windows couldn't play this video here.".Trim() : text;
     }
 
+    /// <summary>Probe failed (no ffmpeg, ffmpeg didn't run, or unreadable file): only the player stays (spec parity 11 §7).</summary>
+    void HideEditing() => _timeline.Visibility = _editRow.Visibility = _saveRow.Visibility = Visibility.Collapsed;
+
     async Task ProbeAsync()
     {
         _player.Pause();   // with Manual loading the media only opens on Play/Pause
@@ -145,6 +149,7 @@ public sealed class VideoEditorWindow : Window
         if (_ffmpeg is null)
         {
             SetStatus("Trimming and GIF need ffmpeg. Set it in Settings.");
+            HideEditing();
             return;
         }
         try
@@ -155,11 +160,13 @@ public sealed class VideoEditorWindow : Window
         {
             Log.Write("Video editor: probe failed", ex);
             SetStatus($"Snapr couldn't run ffmpeg: {ex.Message}");
+            HideEditing();
             return;
         }
         if (_info is null)
         {
             SetStatus("Snapr couldn't read this video.");
+            HideEditing();
             return;
         }
         _cut = VideoCut.For(_info.Duration);

@@ -12,7 +12,8 @@ public sealed record RedactResult(IReadOnlyList<Rct> Boxes, RedactLook Look);
 /// <summary>Smart Redact (spec parity 5 §4): reads the text once, lists what matches, returns the boxes to cover.</summary>
 public sealed class RedactWindow : Window
 {
-    static readonly string[] Colours = ["#FF000000", "#FFFFFFFF", "#FFFF3B30", "#FF3B82F6", "#FF34C759"];
+    internal static readonly (string Color, string Name)[] Colours =
+        [("#FF000000", "Black"), ("#FFFFFFFF", "White"), ("#FFFF3B30", "Red"), ("#FF3B82F6", "Blue"), ("#FF34C759", "Green")];
 
     readonly Func<Task<IReadOnlyList<TextLine>>> _read;
     readonly CheckBox _email = Check("Email addresses"), _web = Check("Web addresses"), _card = Check("Card numbers"), _phone = Check("Phone numbers");
@@ -28,14 +29,15 @@ public sealed class RedactWindow : Window
     IReadOnlyList<RedactMatch> _matches = [];
     readonly bool _largeImage;
     bool _hasRead;
-    string _colour = Colours[0];
+    string _colour = Colours[0].Color;
+    readonly List<(string Color, string Name, Button Button)> _swatches = [];
 
     public RedactResult? Result { get; private set; }
 
     /// <summary>True when Windows has no OCR language; the caller shows the same help as Grab Text.</summary>
     public bool OcrMissing { get; private set; }
 
-    public RedactWindow(Window owner, Func<Task<IReadOnlyList<TextLine>>> read, bool largeImage = false)
+    public RedactWindow(Window owner, Func<Task<IReadOnlyList<TextLine>>> read, bool largeImage = false, RedactLook? look = null)
     {
         Owner = owner;
         Title = "Redact";
@@ -63,6 +65,14 @@ public sealed class RedactWindow : Window
         _words.TextChanged += (_, _) => Refresh();
         _solid.Checked += (_, _) => _colours.IsEnabled = true;
         _pixelate.Checked += (_, _) => _colours.IsEnabled = false;
+        _words.PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) e.Handled = true; };
+        if (look is { } l)
+        {
+            _pixelate.IsChecked = l.Pixelate;
+            _solid.IsChecked = !l.Pixelate;
+            if (Colours.Any(c => c.Color == l.Color)) _colour = l.Color;
+        }
+        _colours.IsEnabled = _solid.IsChecked == true;
         BuildColours();
 
         var find = new WrapPanel();
@@ -87,7 +97,7 @@ public sealed class RedactWindow : Window
         root.Children.Add(_colours);
         root.Children.Add(new TextBlock
         {
-            Text = "Covers are applied when you export, copy or print. The .snapr file keeps the original capture, so share an exported image.",
+            Text = "Covers are applied when you export, copy or print. The .snapr file keeps the original capture, so share an exported image. For text Snapr can't read, select it with the Selection tool (R) and choose Cover selection.",
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 10, 0, 0),
             Foreground = (Brush)Application.Current.FindResource("TextSecondaryBrush"),
@@ -166,21 +176,24 @@ public sealed class RedactWindow : Window
 
     void BuildColours()
     {
-        _colours.Children.Clear();
-        foreach (var c in Colours)
+        foreach (var (c, name) in Colours)
+        {
+            var swatch = new Button { Width = 24, Height = 24, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 0), Background = ImageIo.Brush(c), ToolTip = name };
+            swatch.Click += (_, _) => { _colour = c; StyleColours(); };
+            _swatches.Add((c, name, swatch));
+            _colours.Children.Add(swatch);
+        }
+        StyleColours();
+    }
+
+    void StyleColours()
+    {
+        foreach (var (c, name, swatch) in _swatches)
         {
             var on = c == _colour;
-            var swatch = new Button
-            {
-                Width = 24, Height = 24, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 0),
-                Background = ImageIo.Brush(c),
-                BorderBrush = on ? (Brush)Application.Current.FindResource("AccentBrush") : (Brush)Application.Current.FindResource("PanelBorderBrush"),
-                BorderThickness = new Thickness(on ? 2 : 1),
-                ToolTip = c,
-            };
-            System.Windows.Automation.AutomationProperties.SetName(swatch, $"Colour {c}");
-            swatch.Click += (_, _) => { _colour = c; BuildColours(); };
-            _colours.Children.Add(swatch);
+            swatch.BorderBrush = on ? (Brush)Application.Current.FindResource("AccentBrush") : (Brush)Application.Current.FindResource("PanelBorderBrush");
+            swatch.BorderThickness = new Thickness(on ? 2 : 1);
+            System.Windows.Automation.AutomationProperties.SetName(swatch, on ? $"{name}, selected" : name);
         }
     }
 }

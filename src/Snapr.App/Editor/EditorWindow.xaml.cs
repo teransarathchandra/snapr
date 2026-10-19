@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Snapr.App.Dialogs;
+using Snapr.App.Platform;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
@@ -91,6 +92,7 @@ public partial class EditorWindow : Window
         UpdateTitle();
         _manualZoom = null;
         _pasteCount = 0;
+        _pixelCopy = null;
         InfoBanner.Visibility = Visibility.Collapsed;
         UpdateEmptyState();
         UpdateUndoButtons();
@@ -191,8 +193,8 @@ public partial class EditorWindow : Window
         ApplyZoom();
     }
 
-    void Undo() { if (_undo is { CanUndo: true }) { Board.CommitTextEditor(); Board.ClearPixelSelection(); _undo.Undo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
-    void Redo() { if (_undo is { CanRedo: true }) { Board.ClearPixelSelection(); _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
+    void Undo() { if (_undo is { CanUndo: true }) { HideMagnifierNotice(); Board.CommitTextEditor(); Board.ClearPixelSelection(); _undo.Undo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
+    void Redo() { if (_undo is { CanRedo: true }) { HideMagnifierNotice(); Board.ClearPixelSelection(); _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
 
     void UpdateUndoButtons()
     {
@@ -253,6 +255,9 @@ public partial class EditorWindow : Window
     }
 
     bool _hadPixelSelection;
+    PixelCopy? _pixelCopy;
+    RedactLook _coverLook = new(false, "#FF000000");
+    bool _magnifierNotice;
 
     bool PixelSelectionActive => Board.Tool == ToolKind.Selection && Board.PixelSelection is not null;
 
@@ -260,8 +265,10 @@ public partial class EditorWindow : Window
     bool CopyPixels()
     {
         if (Board.SelectedPixels() is not { } pixels) return false;
+        var area = Board.PixelSelection!.Value;
         if (ClipboardImage.Set(pixels))
         {
+            _pixelCopy = new PixelCopy(area, Native.GetClipboardSequenceNumber());
             _app.Notify("Copied", "The selection is on the clipboard.");
             return true;
         }
@@ -300,6 +307,15 @@ public partial class EditorWindow : Window
             return;
         }
         BitmapSource picture = image;
+        if (PastePlacement.AtCopy(Native.GetClipboardSequenceNumber(), _pixelCopy, picture.PixelWidth, picture.PixelHeight) is { } area && area.Intersect(Board.View) == area)
+        {
+            Board.CommitTextEditor();
+            var a = ImageObjects.CreateAt(picture, area);
+            Board.Apply(s => s.Add(a));
+            SetTool(ToolKind.Move);
+            Board.SelectIds([a.Id]);
+            return;
+        }
         AddImageObjects([("the clipboard image", () => picture)], Board.View.Center);
     }
 
@@ -527,7 +543,7 @@ public partial class EditorWindow : Window
         var area = PixelRect(Board.View);
         var visible = new CroppedBitmap(CurrentImage(), area);
         visible.Freeze();
-        var dialog = new RedactWindow(this, () => OcrService.RecognizeLinesAsync(visible), OcrService.WillDownscale(visible));
+        var dialog = new RedactWindow(this, () => OcrService.RecognizeLinesAsync(visible), OcrService.WillDownscale(visible), look: _coverLook);
         var doc = _doc;
         var ok = dialog.ShowDialog() == true;
         if (dialog.OcrMissing)
@@ -539,13 +555,39 @@ public partial class EditorWindow : Window
         if (!ok || dialog.Result is not { Boxes.Count: > 0 } result) return;
         var image = CurrentImage();
         var boxes = result.Boxes.Select(b => b.Offset(area.X, area.Y)).ToArray();
+        _coverLook = result.Look;
         var (next, added) = Board.State.AddCovers(boxes, result.Look, (image.PixelWidth, image.PixelHeight));
         Board.Apply(_ => next);
         SetTool(ToolKind.Move);
         Board.SelectIds(added);
+        WarnIfMagnified(next, added);
+    }
+
+    /// <summary>Warns when a magnifier still shows part of the new covers; the warning hides again on undo/redo.</summary>
+    void WarnIfMagnified(DocumentState next, IReadOnlyList<Guid> added)
+    {
         var covers = next.Annotations.Where(a => added.Contains(a.Id)).Select(AnnotationGeometry.Bounds).ToArray();
-        if (next.Annotations.OfType<MagnifyAnnotation>().Any(m => covers.Any(c => !m.SourceBounds.Intersect(c).IsEmpty)))
-            ShowNotice("A magnifier still shows part of a covered area. Move or delete it before sharing.");
+        if (!next.Annotations.OfType<MagnifyAnnotation>().Any(m => covers.Any(c => !m.SourceBounds.Intersect(c).IsEmpty))) return;
+        ShowNotice("A magnifier still shows part of a covered area. Move or delete it before sharing.");
+        _magnifierNotice = true;
+    }
+
+    void HideMagnifierNotice()
+    {
+        if (!_magnifierNotice) return;
+        InfoBanner.Visibility = Visibility.Collapsed;
+        _magnifierNotice = false;
+    }
+
+    /// <summary>Cover selection (spec parity 11 §2): a redaction cover over the Selection-tool rectangle, for text OCR can't read.</summary>
+    void CoverSelection()
+    {
+        if (_doc is null || Board.PixelSelection is not { } sel) return;
+        var image = CurrentImage();
+        var (next, added) = Board.State.AddCovers([sel], _coverLook, (image.PixelWidth, image.PixelHeight));
+        Board.Apply(_ => next);
+        Board.ClearPixelSelection();
+        WarnIfMagnified(next, added);
     }
 
     // ---------- Zoom ----------
@@ -744,6 +786,7 @@ public partial class EditorWindow : Window
     /// <summary>A one-time note on the current capture, such as what a Snagit import approximated.</summary>
     public void ShowNotice(string text)
     {
+        _magnifierNotice = false;
         InfoBannerText.Text = text;
         InfoBanner.Visibility = Visibility.Visible;
     }
@@ -822,6 +865,7 @@ public partial class EditorWindow : Window
             case EditorCommand.SelectAll:
                 if (_doc is null) break;
                 Board.CommitTextEditor();
+                if (Board.Tool == ToolKind.Selection) { Board.SelectAllPixels(); Board.Focus(); break; }
                 SetTool(ToolKind.Move);
                 Board.SelectAll();
                 Board.Focus();

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -83,6 +84,19 @@ public static class DocumentRenderer
         }
     }
 
+    // One blurred backdrop per base image instance; weak keys, so old bases (before an image edit) can be collected.
+    static readonly ConditionalWeakTable<BitmapSource, BitmapSource> Backdrops = new();
+
+    /// <summary>The base shrunk by 13 and materialized; drawn scaled up smoothly it is the blurred spotlight backdrop (spec parity 11 §5).</summary>
+    public static BitmapSource SpotlightBackdrop(BitmapSource src) => Backdrops.GetValue(src, s =>
+    {
+        const double f = 13;
+        int sw = Math.Max(1, (int)(s.PixelWidth / f)), sh = Math.Max(1, (int)(s.PixelHeight / f));
+        var small = new WriteableBitmap(new TransformedBitmap(s, new ScaleTransform((double)sw / s.PixelWidth, (double)sh / s.PixelHeight)));
+        small.Freeze();
+        return small;
+    });
+
     /// <summary>One backdrop for all spotlights (spec parity 7 §3.2): outside their union the base is blurred if any asks
     /// for it, then darkened by the largest Dim.</summary>
     static void DrawSpotlights(DrawingContext dc, BitmapSource src, IReadOnlyList<SpotlightAnnotation> all)
@@ -97,7 +111,10 @@ public static class DocumentRenderer
         if (spots.Any(s => s.Blur))
         {
             dc.PushClip(outside);
-            DrawBlur(dc, src, new BlurAnnotation(new Rct(0, 0, src.PixelWidth, src.PixelHeight), BlurMode.Blur, 12));
+            var g = new DrawingGroup();
+            RenderOptions.SetBitmapScalingMode(g, BitmapScalingMode.HighQuality);
+            using (var gc = g.Open()) gc.DrawImage(SpotlightBackdrop(src), new Rect(0, 0, src.PixelWidth, src.PixelHeight));
+            dc.DrawDrawing(g);
             dc.Pop();
         }
         var dim = spots.Max(s => Math.Clamp(s.Dim, 0, 90));

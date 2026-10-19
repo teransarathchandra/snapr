@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
+using Snapr.App.Dialogs;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
@@ -235,6 +236,11 @@ public partial class EditorWindow
             SwatchRow(Board.GapFill ?? "#00000000", c => { Board.GapFill = c; BuildProps(); });
             var crop = ButtonRow(("Crop to selection", Board.CropToPixelSelection))[0];
             crop.IsEnabled = Board.PixelSelection is not null;
+            ChoiceRow("Cover", [("Solid block", false), ("Pixelate", true)], _coverLook.Pixelate, v => { _coverLook = _coverLook with { Pixelate = v }; BuildProps(); });
+            if (!_coverLook.Pixelate)
+                SwatchRow(_coverLook.Color, c => { _coverLook = _coverLook with { Color = c }; BuildProps(); }, RedactWindow.Colours.Select(c => c.Color).ToArray(), c => RedactWindow.Colours.First(x => x.Color == c).Name);
+            var cover = ButtonRow(("Cover selection", CoverSelection))[0];
+            cover.IsEnabled = Board.PixelSelection is not null;
             Hint("Drag to select. Drag inside to move. Delete clears, Ctrl+C copies, Ctrl+X cuts.");
         }
         if (kind == ToolKind.Stamp && Board.Tool == ToolKind.Stamp) StampPicker(style.Color);
@@ -334,10 +340,10 @@ public partial class EditorWindow
     void Hint(string text) =>
         PropsPanel.Children.Add(new TextBlock { Text = text, Foreground = (Brush)FindResource("TextSecondaryBrush"), FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0) });
 
-    void SwatchRow(string current, Action<string> pick)
+    void SwatchRow(string current, Action<string> pick, IReadOnlyList<string>? colours = null, Func<string, string>? nameOf = null)
     {
         var row = new WrapPanel();
-        foreach (var c in Swatches)
+        foreach (var c in colours ?? Swatches)
         {
             var on = ColorText.WithAlpha(c, 0xFF) == ColorText.WithAlpha(current, 0xFF);
             var swatch = new Button
@@ -346,9 +352,9 @@ public partial class EditorWindow
                 Background = ImageIo.Brush(c),
                 BorderBrush = on ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("PanelBorderBrush"),
                 BorderThickness = new Thickness(on ? 2 : 1),
-                ToolTip = c,
+                ToolTip = nameOf?.Invoke(c) ?? c,
             };
-            AutomationProperties.SetName(swatch, $"Colour {c}");
+            AutomationProperties.SetName(swatch, $"Colour {nameOf?.Invoke(c) ?? c}");
             swatch.Click += (_, _) => { pick(c); Board.Focus(); };
             row.Children.Add(swatch);
         }

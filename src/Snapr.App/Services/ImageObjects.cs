@@ -24,6 +24,10 @@ public static class ImageObjects
         return new ImageAnnotation(new Rct(center.X - w / 2, center.Y - h / 2, w, h), Convert.ToBase64String(png));
     }
 
+    /// <summary>An Image object exactly on <paramref name="area"/> at 1:1, for pasting a selection back where it was copied from.</summary>
+    public static ImageAnnotation CreateAt(BitmapSource image, Rct area) =>
+        new(area, Convert.ToBase64String(ImageIo.EncodePng(ImageIo.ToBgra(image))));
+
     /// <summary>Reads an image file. Checks the file size and the pixel count before the pixels are decoded.</summary>
     public static BitmapSource Load(string path)
     {

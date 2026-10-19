@@ -80,6 +80,14 @@ public sealed class EditorCanvas : Canvas
 
     public void ClearPixelSelection() => SetPixelSelection(null);
 
+    /// <summary>Ctrl+A in the Selection tool: the whole view (crop, or the image) becomes the pixel selection.</summary>
+    public void SelectAllPixels()
+    {
+        if (_base is null) return;
+        var v = View;
+        SetPixelSelection(SelectionRect.FromDrag(new Pt(v.X, v.Y), new Pt(v.Right, v.Bottom), _base.PixelWidth, _base.PixelHeight));
+    }
+
     bool _ownEdit;   // committing our own pixel edit: the selection survives the image change
 
     void CommitOwn(DocumentState next)
@@ -269,7 +277,20 @@ public sealed class EditorCanvas : Canvas
     {
         var v = _base is null ? default : new Rct(0, 0, _base.PixelWidth, _base.PixelHeight);
         var band = CutVertical ? new Rect(cut.Start, v.Y, cut.End - cut.Start, v.H) : new Rect(v.X, cut.Start, v.W, cut.End - cut.Start);
-        dc.DrawRectangle(CutFill, new Pen(CutLine, 1.5 / Zoom) { DashStyle = DashStyles.Dash }, band);
+        dc.DrawRectangle(CutFill, null, band);
+        var hatch = new Pen(CutLine, 1 / Zoom);
+        foreach (var (a, b) in CutHatch.Lines(band, 8 / Zoom)) dc.DrawLine(hatch, a, b);
+        var edge = new Pen(CutLine, 1.5 / Zoom);
+        if (CutVertical)
+        {
+            dc.DrawLine(edge, band.TopLeft, band.BottomLeft);
+            dc.DrawLine(edge, band.TopRight, band.BottomRight);
+        }
+        else
+        {
+            dc.DrawLine(edge, band.TopLeft, band.TopRight);
+            dc.DrawLine(edge, band.BottomLeft, band.BottomRight);
+        }
     }
 
     static readonly Brush CutFill = Frozen(new SolidColorBrush(Color.FromArgb(0x80, 0xFF, 0x3B, 0x30)));
@@ -379,7 +400,9 @@ public sealed class EditorCanvas : Canvas
     {
         if (_base is null) return;
         var p = ToImage(e);
-        Cursor = Tool == ToolKind.Move && OnHandle(p) ? Cursors.SizeNWSE : ToolCursor;
+        Cursor = Tool == ToolKind.Move && OnHandle(p) ? Cursors.SizeNWSE
+            : Tool == ToolKind.Selection && (_movingPixels || !IsMouseCaptured && _pixelSelection is { } over && over.Contains(p)) ? Cursors.SizeAll
+            : ToolCursor;
         if (!IsMouseCaptured) return;
         switch (Tool)
         {
