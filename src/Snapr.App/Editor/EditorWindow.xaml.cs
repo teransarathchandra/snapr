@@ -598,6 +598,66 @@ public partial class EditorWindow : Window
         WarnIfMagnified(next, added);
     }
 
+    SimplifyOptions _simplifyOptions = SimplifyOptions.Default;
+    bool _simplifying;
+
+    void Simplify_Click(object sender, RoutedEventArgs e) => _app.Fire(SimplifyAsync);
+
+    /// <summary>Simplify (spec parity 15 §4): OCR the visible area like Redact, find blocks, add one group of shapes.</summary>
+    async Task SimplifyAsync()
+    {
+        if (_doc is null || _simplifying) return;
+        _simplifying = true;
+        try
+        {
+            Board.CommitTextEditor();
+            var dialog = new SimplifyWindow(this, Swatches, _simplifyOptions);
+            if (dialog.ShowDialog() != true || dialog.Result is not { } options) return;
+            _simplifyOptions = options;
+            var doc = _doc;
+            var edits = _undo!.Current.Edits;
+            var view = Board.View;
+            bool Stale() => !ReferenceEquals(doc, _doc) || _undo is null || !ReferenceEquals(edits, _undo.Current.Edits) || Board.View != view;   // capture changed or image edited meanwhile
+            var area = PixelRect(view);
+            var visible = new CroppedBitmap(CurrentImage(), area);
+            visible.Freeze();
+            IReadOnlyList<TextLine> lines = [];
+            var noOcr = false;
+            var cursor = Mouse.OverrideCursor;
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                try { lines = await OcrService.RecognizeLinesAsync(visible); }
+                catch (OcrUnavailableException) { noOcr = true; }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    Log.Write("Simplify: reading text failed", ex);
+                    if (options.Text) MessageBox.Show(this, $"Snapr couldn't read the text: {ex.Message}", "Simplify", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                if (Stale()) return;
+                var shapes = await Task.Run(() => SimplifyService.Build(visible, new Rct(area.X, area.Y, area.Width, area.Height), lines, options));
+                if (Stale()) return;
+                if (shapes.Count == 0)
+                {
+                    ShowNotice(noOcr && options.Text ? "Windows has no text recognition language, so text was left as is." : "Snapr found nothing to simplify here.");
+                    return;
+                }
+                Board.Apply(s => s with { Annotations = [.. s.Annotations, .. shapes] });
+                SetTool(ToolKind.Move);
+                Board.SelectIds(shapes.Select(s => s.Id).ToArray());
+                if (noOcr && options.Text) ShowNotice("Windows has no text recognition language, so text was left as is.");
+            }
+            finally
+            {
+                Mouse.OverrideCursor = cursor;
+            }
+        }
+        finally
+        {
+            _simplifying = false;
+        }
+    }
+
     /// <summary>Warns when a magnifier still shows part of the new covers; the warning hides again on undo/redo.</summary>
     void WarnIfMagnified(DocumentState next, IReadOnlyList<Guid> added)
     {

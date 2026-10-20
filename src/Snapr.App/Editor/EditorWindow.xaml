@@ -34,6 +34,7 @@
                 <Separator/>
                 <MenuItem Header="Resize image…" Click="ResizeImage_Click"/>
                 <MenuItem Header="Canvas size…" Click="CanvasSize_Click"/>
+                <MenuItem Header="Simplify…" Click="Simplify_Click"/>
                 <Separator/>
                 <MenuItem x:Name="RevertImageItem" Header="Revert to original image" Click="RevertImage_Click"/>
               </ContextMenu>

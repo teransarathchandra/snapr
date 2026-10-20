@@ -16,6 +16,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Stamps**: 25 built-in recolourable stamps (check, cross, warning, arrows, badges …) plus your own PNG stamps (Stamp tool, G).
 - **Edit the image**: rotate, flip, resize, add margins (Image ▾) and fill areas with colour (Fill tool, F). Objects follow, every change can be undone while you edit, and the original capture pixels are always kept in the file.
 - **Redact** emails, web addresses, card numbers, phone numbers or words you choose: Snapr reads the text (Windows OCR) and covers what you tick with solid blocks or pixelation. **Revert to original image** (Image ▾) undoes all image edits, even after reopening. Covers are applied when you export, copy or print. The .snapr file keeps the original capture, so share an exported image.
+- **Simplify** (Image ▾ → Simplify…): turns text into rounded bars and buttons, panels and pictures into flat boxes, as one editable group — optionally over a plain background that hides the original.
 - **Effects**: border, drop shadow and torn edge.
 - **Grab Text** (OCR) from any part of the screen, using the OCR engine built into Windows.
 - **Scrolling capture** of long pages.
