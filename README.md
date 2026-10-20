@@ -23,6 +23,7 @@ It is a single portable `.exe`: no installer and no admin rights.
 - **Panoramic capture**: choose an area, then scroll, drag or pan the content yourself in any direction; Snapr follows and stitches it into one image (tray menu or Ctrl+Alt+Shift+Print Screen).
 - **Capture presets**: save a target (choose area, screen under the mouse, all screens or a fixed area), delay, action (edit, copy, grab text, save to a folder) and an optional hotkey; run them from Settings, the tray or the hotkey.
 - **Record video** of a region to MP4 with system audio and microphone.
+- **Webcam in recordings**: turn on "Show webcam while recording" in Settings to put a round or rounded webcam bubble in the corner of the recorded area; drag it anywhere inside the area, or hide it with the Camera button on the recording bar.
 - **Trim videos and make GIFs**: after recording (or from the recents strip) trim the start and end, remove parts from the middle, and save a new MP4 or an animated GIF (uses your ffmpeg).
 - **Annotate videos**: pause, click Annotate and draw arrows, text, shapes, highlights, steps or stamps on the frame; each shows for 3 s from there, and you retime it by dragging its bar on the Objects track. Cuts and annotations are kept next to the video (`clip.mp4.snapr-edit.json`) and drawn into the saved MP4 or GIF.
 - Every capture is saved automatically as a `.snapr` file and shown in the recents strip.

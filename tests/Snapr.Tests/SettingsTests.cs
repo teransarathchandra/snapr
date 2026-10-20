@@ -110,4 +110,21 @@ public sealed class SettingsTests : IDisposable
         File.WriteAllText(PathOf("p4.json"), """{"hotkeys":{"panoramicCapture":""}}""");
         Assert.Equal("", SettingsStore.Load(PathOf("p4.json")).Hotkeys.PanoramicCapture);
     }
+
+    [Fact]
+    public void Webcam_settings_round_trip_and_default()
+    {
+        var s = new AppSettings { Webcam = new WebcamSettings(true, "cam-1", WebcamShape.RoundedRectangle, WebcamSize.Large, false) };
+        SettingsStore.Save(s, PathOf("w.json"));
+        Assert.Equal(s.Webcam, SettingsStore.Load(PathOf("w.json")).Webcam);
+        File.WriteAllText(PathOf("old.json"), """{"exportFormat":"png"}""");
+        Assert.Equal(new WebcamSettings(), SettingsStore.Load(PathOf("old.json")).Webcam);
+    }
+
+    [Fact]
+    public void Null_webcam_gets_defaults()
+    {
+        File.WriteAllText(PathOf("wn.json"), """{"webcam":null}""");
+        Assert.Equal(new WebcamSettings(), SettingsStore.Load(PathOf("wn.json")).Webcam);
+    }
 }

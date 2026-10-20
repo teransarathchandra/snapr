@@ -22,7 +22,7 @@ public sealed class RecordingBar : Window
     readonly Stopwatch _elapsed = Stopwatch.StartNew();
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
-    public RecordingBar(AppController app, Rct screenRect, bool micUnavailable)
+    public RecordingBar(AppController app, Rct screenRect, bool micUnavailable, bool hasCamera = false)
     {
         _area = screenRect;
         WindowStyle = WindowStyle.None;
@@ -52,6 +52,16 @@ public sealed class RecordingBar : Window
                 Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock { Text = "No mic", Foreground = Brushes.White, FontSize = 11 },
             });
+        if (hasCamera)
+        {
+            var camera = new Button { Content = "Hide camera" };
+            camera.Click += (_, _) =>
+            {
+                app.ToggleWebcam();
+                camera.Content = (string)camera.Content == "Hide camera" ? "Show camera" : "Hide camera";
+            };
+            row.Children.Add(camera);
+        }
         row.Children.Add(_pause);
         row.Children.Add(stop);
         Content = new Border
