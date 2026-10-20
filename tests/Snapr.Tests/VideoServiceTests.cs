@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using Snapr.App.Rendering;
 using Snapr.App.Services;
+using Snapr.App.Video;
+using Snapr.Core;
 using Snapr.Core.Recording;
 using Snapr.Core.Video;
 
@@ -125,5 +128,46 @@ public sealed class VideoServiceTests : IDisposable
         var notVideo = Path.Combine(_dir, "x.mp4");
         File.WriteAllText(notVideo, "nope");
         Assert.Null(await VideoService.ProbeAsync(ffmpeg, notVideo));
+    }
+
+    [Fact]
+    public async Task Export_draws_objects_only_at_their_time()
+    {
+        if (Ffmpeg is not { } ffmpeg) return;
+        var clip = MakeClip(ffmpeg, "o.mp4", 3, audio: false);
+        var project = VideoProject.For(3).SetObjects(
+            [new(new ShapeAnnotation(ShapeKind.Rectangle, new Rct(100, 80, 120, 80), "#FFFF0000", 1, Fill: "#FFFF0000"), 1, 2)]);
+        IReadOnlyList<VideoOverlayLayer> layers = [];
+        Sta.Run(() => layers = VideoOverlays.Write(project, 320, 240, _dir));
+        var output = Path.Combine(_dir, "o edited.mp4");
+        await VideoService.ExportAsync(ffmpeg, part => VideoExportArgs.Mp4(clip, project.Cut.Kept, false, part, layers), output, 3, null, CancellationToken.None);
+
+        var on = await VideoService.GrabFrameAsync(ffmpeg, output, 1.5);
+        var off = await VideoService.GrabFrameAsync(ffmpeg, output, 2.5);
+        Assert.NotNull(on);
+        Assert.NotNull(off);
+        Sta.Run(() =>
+        {
+            var p = ImageIo.PixelAt(on!, 160, 120);
+            Assert.True(((p >> 16) & 0xFF) > 200 && ((p >> 8) & 0xFF) < 60 && (p & 0xFF) < 60, $"{p:X8}");
+            var q = ImageIo.PixelAt(off!, 160, 120);
+            Assert.False(((q >> 16) & 0xFF) > 200 && ((q >> 8) & 0xFF) < 60 && (q & 0xFF) < 60, $"{q:X8}");
+        });
+    }
+
+    [Fact]
+    public async Task GrabFrame_at_the_end_returns_the_last_frame()
+    {
+        if (Ffmpeg is not { } ffmpeg) return;
+        var frame = await VideoService.GrabFrameAsync(ffmpeg, MakeClip(ffmpeg, "end.mp4", 3, audio: false), 3.0);
+        Assert.NotNull(frame);
+        Assert.Equal((320, 240), (frame!.PixelWidth, frame.PixelHeight));
+    }
+
+    [Fact]
+    public async Task GrabFrame_of_a_missing_file_is_null()
+    {
+        if (Ffmpeg is not { } ffmpeg) return;
+        Assert.Null(await VideoService.GrabFrameAsync(ffmpeg, Path.Combine(_dir, "missing.mp4"), 1));
     }
 }
