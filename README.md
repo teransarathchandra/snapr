@@ -22,19 +22,25 @@
 
 ## See it
 
-### 1 · Capture and annotate
+### 1 · Install in 10 seconds
+
+Download one file and run it. No installer, no admin rights. Snapr waits in the tray.
+
+<img src="docs/assets/install.gif" alt="PowerShell downloads Snapr.exe with curl, runs it, then Print Screen captures part of the screen and the editor opens" width="100%">
+
+### 2 · Capture and annotate
 
 Press <kbd>Print Screen</kbd>, drag an area, then add arrows, text and numbered steps. Everything stays editable.
 
-<img src="docs/assets/capture.gif" alt="A region is captured, then an arrow, a text label and two numbered steps are added" width="100%">
+<img src="docs/assets/annotate.gif" alt="A region is captured, then an arrow, a typed text label and two numbered steps are added" width="100%">
 
-### 2 · Redact in one click
+### 3 · Redact in one click
 
-Snapr reads the text in the capture and finds emails, phone numbers, card numbers and web addresses for you.
+Snapr reads the capture and finds emails, phone numbers, card numbers and web addresses. Type any other word to hide it too.
 
-<img src="docs/assets/redact.gif" alt="Redact finds four emails and four phone numbers and covers them" width="100%">
+<img src="docs/assets/redact.gif" alt="Redact lists four emails and four phone numbers, the word Sofia is typed, and all of them are covered with black blocks" width="100%">
 
-### 3 · Simplify
+### 4 · Simplify
 
 Turn a busy screenshot into clean wireframe shapes, ready for docs and slides.
 
@@ -58,8 +64,12 @@ The full list is in [docs/features.md](docs/features.md).
 
 ## Get started
 
-1. **[Download Snapr.exe](https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe)** and run it. It sits in the tray.
-2. Press <kbd>Print Screen</kbd> and drag an area.
+1. **[Download Snapr.exe](https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe)** and run it, or in PowerShell:
+   ```powershell
+   curl.exe -LO https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe
+   .\Snapr.exe
+   ```
+2. Snapr starts in the tray. Press <kbd>Print Screen</kbd> and drag an area.
 
 > [!NOTE]
 > The exe is not code-signed yet. If Windows SmartScreen appears, click **More info → Run anyway**.
