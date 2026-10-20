@@ -24,4 +24,5 @@ public sealed record AppSettings
     public ToolKind LastTool { get; init; } = ToolKind.Arrow;
     public IReadOnlyList<CapturePreset> Presets { get; init; } = [];
     public WebcamSettings Webcam { get; init; } = new();
+    public ShareSettings Share { get; init; } = new();
 }

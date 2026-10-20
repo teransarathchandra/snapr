@@ -127,4 +127,18 @@ public sealed class SettingsTests : IDisposable
         File.WriteAllText(PathOf("wn.json"), """{"webcam":null}""");
         Assert.Equal(new WebcamSettings(), SettingsStore.Load(PathOf("wn.json")).Webcam);
     }
+
+    [Fact]
+    public void Share_settings_round_trip_and_defaults()
+    {
+        var s = new AppSettings { Share = new ShareSettings(@"C:\S", "https://x/", new UploadSettings("https://u/", "f", "Authorization", "AAAA", UploadLinkMode.JsonField, "data.link")) };
+        SettingsStore.Save(s, PathOf("sh.json"));
+        var back = SettingsStore.Load(PathOf("sh.json")).Share;
+        Assert.Equal(s.Share with { Upload = null }, back with { Upload = null });
+        Assert.Equal(s.Share.Upload, back.Upload);
+        File.WriteAllText(PathOf("old.json"), """{"exportFormat":"png"}""");
+        Assert.Equal(new ShareSettings(), SettingsStore.Load(PathOf("old.json")).Share);
+        File.WriteAllText(PathOf("null.json"), """{"share":null}""");
+        Assert.Equal(new ShareSettings(), SettingsStore.Load(PathOf("null.json")).Share);
+    }
 }

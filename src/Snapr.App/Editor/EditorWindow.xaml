@@ -22,6 +22,15 @@
           <Button x:Name="LibraryButton" Content="Library" ToolTip="Browse, search and tag all captures (Ctrl+L)" Click="Library_Click"/>
           <Button x:Name="RedactButton" Content="Redact…" ToolTip="Find and cover emails, web addresses, card numbers, phone numbers or words you choose" Click="Redact_Click"/>
           <Button Content="Copy" ToolTip="Copy image (Ctrl+C copies the selected object)" Click="Copy_Click"/>
+          <Button x:Name="ShareButton" Content="Share ▾" Click="Share_Click">
+            <Button.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="Copy to share folder" Click="ShareFolder_Click"/>
+                <MenuItem Header="Upload" Click="ShareUpload_Click"/>
+                <MenuItem Header="Windows Share…" Click="ShareWindows_Click"/>
+              </ContextMenu>
+            </Button.ContextMenu>
+          </Button>
           <Button Content="Save" ToolTip="Save as image (Ctrl+Shift+S)" Style="{StaticResource AccentButton}" Click="Save_Click"/>
           <Button x:Name="ImageButton" Content="Image ▾" ToolTip="Rotate, flip, resize or add margins to the image" Click="ImageMenu_Click">
             <Button.ContextMenu>

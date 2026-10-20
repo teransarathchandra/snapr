@@ -26,6 +26,7 @@
 - **Effects**: border, drop shadow and torn edge.
 - **Open Snagit captures**: `.snagx` files open as editable Snapr captures. The `.snagx` is never changed; anything Snapr approximates is listed in a banner.
 - **Export** to PNG, JPG, GIF, BMP or PDF, and **print** fitted to the page or at actual size.
+- **Share** to a share folder (link or path copied), your own upload endpoint (link copied), or the Windows Share dialog. Set it up in Settings → Sharing.
 
 ## Video
 

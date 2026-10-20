@@ -30,6 +30,8 @@ public sealed class VideoEditorWindow : Window
     readonly Button _redo = new() { Content = "Redo", IsEnabled = false };
     readonly Button _saveMp4 = new() { Content = "Save MP4…", IsEnabled = false };
     readonly Button _saveGif = new() { Content = "Save GIF…", IsEnabled = false };
+    readonly Button _share = new() { Content = "Share ▾", IsEnabled = false };
+    string? _lastSaved;   // the last MP4/GIF this window saved successfully; Share sends it, else the recording
     readonly ComboBox _width = new() { ItemsSource = new[] { "Original", "800", "640", "480" }, SelectedIndex = 2, Width = 90, Margin = new Thickness(8, 0, 8, 0) };
     readonly ComboBox _fps = new() { ItemsSource = new[] { 10, 15 }, SelectedIndex = 0, Width = 60, Margin = new Thickness(8, 0, 0, 0) };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, Width = 200, Height = 12, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 8, 0) };
@@ -65,7 +67,7 @@ public sealed class VideoEditorWindow : Window
         open.Click += (_, _) => OpenDefault();
         var transport = Row(_play, _time, open);
         _editRow = Row(_annotate, _remove, _undo, _redo);
-        _saveRow = Row(_saveMp4, _saveGif, new TextBlock { Text = "Width", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, _width,
+        _saveRow = Row(_saveMp4, _saveGif, _share, new TextBlock { Text = "Width", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(16, 0, 0, 0) }, _width,
             new TextBlock { Text = "FPS", VerticalAlignment = VerticalAlignment.Center }, _fps, _progress, _cancel);
 
         var root = new DockPanel { Margin = new Thickness(20) };
@@ -113,6 +115,12 @@ public sealed class VideoEditorWindow : Window
         _saveMp4.Click += async (_, _) => await SaveMp4Async();
         _saveGif.Click += async (_, _) => await SaveGifAsync();
         _cancel.Click += (_, _) => _cts?.Cancel();
+        _share.ContextMenu = ShareMenu();
+        _share.Click += (_, _) =>
+        {
+            _share.ContextMenu.PlacementTarget = _share;
+            _share.ContextMenu.IsOpen = true;
+        };
         _timeline.TrimChanged += (s, e) => Apply(_project with { Cut = _project.Cut.WithTrim(s, e) });
         _timeline.Seek += t =>
         {
@@ -210,7 +218,7 @@ public sealed class VideoEditorWindow : Window
         _annotate.IsEnabled = _ready && !Saving && !_playing && !_grabbing;
         _undo.IsEnabled = _ready && !Saving && _undoStack.Count > 0;
         _redo.IsEnabled = _ready && !Saving && _redoStack.Count > 0;
-        _saveMp4.IsEnabled = _saveGif.IsEnabled = _width.IsEnabled = _fps.IsEnabled = _ready && !Saving && !_grabbing;
+        _saveMp4.IsEnabled = _saveGif.IsEnabled = _share.IsEnabled = _width.IsEnabled = _fps.IsEnabled = _ready && !Saving && !_grabbing;
         UpdateTime();
     }
 
@@ -392,6 +400,22 @@ public sealed class VideoEditorWindow : Window
         }
     }
 
+    ContextMenu ShareMenu()
+    {
+        var menu = new ContextMenu();
+        foreach (var (header, target) in new[] { ("Copy to share folder", ShareTarget.Folder), ("Upload", ShareTarget.Upload), ("Windows Share…", ShareTarget.Windows) })
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) =>
+            {
+                var file = _lastSaved is not null && File.Exists(_lastSaved) ? _lastSaved : _file;
+                _app.Fire(() => _app.ShareAsync(this, target, file, () => file, deleteAfter: false));
+            };
+            menu.Items.Add(item);
+        }
+        return menu;
+    }
+
     string? Ask(string filter, string name)
     {
         var dialog = new SaveFileDialog
@@ -445,6 +469,7 @@ public sealed class VideoEditorWindow : Window
                 layers = VideoOverlays.Write(_project, _info!.Width, _info.Height, folder);
             }
             await VideoService.ExportAsync(_ffmpeg!, part => args(part, layers), path, seconds, new Progress<double>(v => _progress.Value = v), _cts.Token);
+            _lastSaved = path;
             _app.RefreshRecents();
             _app.Notify("Saved", Path.GetFileName(path));
         }

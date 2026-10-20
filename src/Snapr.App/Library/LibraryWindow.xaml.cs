@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using Microsoft.VisualBasic.FileIO;
 using Snapr.App.Dialogs;
 using Snapr.App.Rendering;
+using Snapr.App.Services;
 using Snapr.Core;
 using Snapr.Core.Video;
 
@@ -146,6 +147,7 @@ public partial class LibraryWindow : Window
         var sel = Selected;
         OpenButton.IsEnabled = FolderButton.IsEnabled = DeleteButton.IsEnabled = sel.Count > 0;
         TagsButton.IsEnabled = TemplateButton.IsEnabled = sel.Count > 0 && sel.All(i => !i.IsVideo && !i.Unreadable);
+        ShareButton.IsEnabled = sel is [{ Unreadable: false }];
     }
 
     void Menu_Opened(object sender, RoutedEventArgs e)
@@ -154,8 +156,9 @@ public partial class LibraryWindow : Window
         items[0].IsEnabled = OpenButton.IsEnabled;
         items[1].IsEnabled = TagsButton.IsEnabled;
         items[2].IsEnabled = TemplateButton.IsEnabled;
-        items[3].IsEnabled = FolderButton.IsEnabled;
-        items[4].IsEnabled = DeleteButton.IsEnabled;
+        items[3].IsEnabled = ShareButton.IsEnabled;
+        items[4].IsEnabled = FolderButton.IsEnabled;
+        items[5].IsEnabled = DeleteButton.IsEnabled;
     }
 
     void Search_TextChanged(object sender, TextChangedEventArgs e)
@@ -229,6 +232,37 @@ public partial class LibraryWindow : Window
         if (sel.Count == 0 || !TemplateButton.IsEnabled) return;
         _app.ShowTemplate(this, sel.Select(i => i.Path).ToArray());
         Rescan();
+    }
+
+    void ShareFolder_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Folder);
+    void ShareUpload_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Upload);
+    void ShareWindows_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Windows);
+
+    void Share_Click(object sender, RoutedEventArgs e)
+    {
+        ShareButton.ContextMenu.PlacementTarget = ShareButton;
+        ShareButton.ContextMenu.IsOpen = true;
+    }
+
+    void Share(ShareTarget target)
+    {
+        if (Selected is not [{ Unreadable: false } item]) return;
+        _app.Fire(() => _app.ShareAsync(this, target, item.Path, () => item.IsVideo ? item.Path : RenderForShare(item.Path), deleteAfter: !item.IsVideo));
+    }
+
+    /// <summary>Renders the capture as Export does into a temp PNG named after the capture.</summary>
+    static string RenderForShare(string path)
+    {
+        try
+        {
+            return AppController.WriteShareTemp(CombineService.Flatten(SnaprFile.Load(path)), Path.GetFileNameWithoutExtension(path));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException
+            or NotSupportedException or OutOfMemoryException or System.Text.Json.JsonException)
+        {
+            Log.Write($"Library: couldn't read {path} to share", ex);
+            throw new ShareException("Snapr couldn't read that capture.");
+        }
     }
 
     void Folder_Click(object sender, RoutedEventArgs e)

@@ -3,10 +3,12 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using NAudio.CoreAudioApi;
 using Snapr.App.Services;
 using Snapr.Core;
+using Snapr.Core.Output;
 using Snapr.Core.Recording;
 using Snapr.Core.Settings;
 
@@ -60,7 +62,103 @@ public partial class SettingsWindow : Window
         FfmpegBox.TextChanged += (_, _) => UpdateFfmpegStatus();
         _presets.AddRange(s.Presets);
         ShowPresets();
+        var share = s.Share;
+        ShareFolderBox.Text = share.Folder ?? "";
+        SharePrefixBox.Text = share.UrlPrefix ?? "";
+        UploadUrlBox.Text = share.Upload?.Url ?? "";
+        UploadFieldBox.Text = share.Upload?.FieldName ?? "file";
+        UploadHeaderNameBox.Text = share.Upload?.HeaderName ?? "";
+        _savedHeader = share.Upload?.HeaderValueProtected;   // the PasswordBox is never pre-filled
+        ShowHeaderHint();
+        LinkBodyRadio.IsChecked = share.Upload?.LinkMode != UploadLinkMode.JsonField;
+        LinkJsonRadio.IsChecked = share.Upload?.LinkMode == UploadLinkMode.JsonField;
+        JsonPathBox.Text = share.Upload?.JsonPath ?? "";
+        JsonPathBox.IsEnabled = LinkJsonRadio.IsChecked == true;
     }
+
+    string? _savedHeader;
+
+    /// <summary>Brings a section into view when Settings is opened from elsewhere (only "Sharing" for now).</summary>
+    public void ShowSection(string? section)
+    {
+        if (section == "Sharing") Dispatcher.BeginInvoke(() => SharingHeader.BringIntoView(), DispatcherPriority.Loaded);
+    }
+
+    void ShowHeaderHint()
+    {
+        HeaderHint.Text = _savedHeader is null ? "" : "A value is saved.";
+        ClearHeaderButton.IsEnabled = _savedHeader is not null;
+    }
+
+    void ClearHeader_Click(object sender, RoutedEventArgs e)
+    {
+        _savedHeader = null;
+        UploadHeaderValueBox.Clear();
+        ShowHeaderHint();
+    }
+
+    void LinkMode_Changed(object sender, RoutedEventArgs e) { if (JsonPathBox is not null) JsonPathBox.IsEnabled = LinkJsonRadio.IsChecked == true; }
+
+    void BrowseShareFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog();
+        if (!string.IsNullOrWhiteSpace(ShareFolderBox.Text) && Directory.Exists(ShareFolderBox.Text.Trim())) dialog.InitialDirectory = ShareFolderBox.Text.Trim();
+        if (dialog.ShowDialog(this) == true) ShareFolderBox.Text = dialog.FolderName;
+    }
+
+    static string? NullIfEmpty(string text) => text.Trim() is { Length: > 0 } t ? t : null;
+
+    UploadLinkMode LinkMode => LinkJsonRadio.IsChecked == true ? UploadLinkMode.JsonField : UploadLinkMode.WholeBody;
+
+    /// <summary>The upload values as entered: a typed header value replaces the saved one (protected in memory).</summary>
+    UploadSettings TypedUpload() => new(UploadUrlBox.Text.Trim(), NullIfEmpty(UploadFieldBox.Text) ?? "file", NullIfEmpty(UploadHeaderNameBox.Text),
+        UploadHeaderValueBox.Password.Length > 0 ? SecretStore.Protect(UploadHeaderValueBox.Password) : _savedHeader,
+        LinkMode, LinkMode == UploadLinkMode.JsonField ? NullIfEmpty(JsonPathBox.Text) : null);
+
+    void ShowShareError(string? message)
+    {
+        ShareError.Text = message ?? "";
+        ShareError.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    async void TestUpload_Click(object sender, RoutedEventArgs e)
+    {
+        var error = ShareRules.UploadUrlError(UploadUrlBox.Text) ?? ShareRules.JsonPathError(LinkMode, JsonPathBox.Text);
+        ShowShareError(error);
+        if (error is not null) return;
+        var upload = TypedUpload();
+        var folder = Path.Combine(Path.GetTempPath(), "snapr-share-" + Guid.NewGuid().ToString("N"));
+        var previous = Cursor;
+        Cursor = Cursors.Wait;
+        TestUploadButton.IsEnabled = false;
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var file = Path.Combine(folder, "snapr-test.png");
+            File.WriteAllBytes(file, Convert.FromBase64String(TestPng));
+            var link = await new ShareService().UploadAsync(file, upload, CancellationToken.None);
+            MessageBox.Show(this, "The upload worked. The link is:\n\n" + link, "Snapr", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (ShareException ex)
+        {
+            MessageBox.Show(this, ex.Message, "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Log.Write("Test upload failed", ex);
+            MessageBox.Show(this, "Snapr couldn't prepare the test file.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            Cursor = previous;
+            TestUploadButton.IsEnabled = true;
+            try { Directory.Delete(folder, true); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { Log.Write("Couldn't delete the test upload folder", ex); }
+        }
+    }
+
+    // A 1 x 1 transparent PNG.
+    const string TestPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
     sealed record PresetRow(CapturePreset Preset)
     {
@@ -221,6 +319,13 @@ public partial class SettingsWindow : Window
             MessageBox.Show(this, "Each action needs a different hotkey.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        var shareError = ShareSetup.Validate(ShareFolderBox.Text, SharePrefixBox.Text, UploadUrlBox.Text, LinkMode, JsonPathBox.Text);
+        ShowShareError(shareError);
+        if (shareError is not null)
+        {
+            SharingHeader.BringIntoView();
+            return;
+        }
         var ffmpeg = FfmpegBox.Text.Trim();
         _app.UpdateSettings(_app.Settings with
         {
@@ -237,6 +342,8 @@ public partial class SettingsWindow : Window
                 _camerasLoaded ? (CameraCombo.SelectedItem as CameraChoice)?.Id : _cameraId,   // list not loaded yet: keep the saved camera
                 (WebcamShape)Math.Max(0, ShapeCombo.SelectedIndex), (WebcamSize)Math.Max(0, SizeCombo.SelectedIndex), MirrorCheck.IsChecked == true),
             Presets = _presets.ToArray(),
+            Share = new ShareSettings(NullIfEmpty(ShareFolderBox.Text), NullIfEmpty(SharePrefixBox.Text),
+                string.IsNullOrWhiteSpace(UploadUrlBox.Text) ? null : TypedUpload()),
         });
         Close();
     }

@@ -76,6 +76,41 @@
       <CheckBox x:Name="MirrorCheck" Content="Mirror"/>
     </StackPanel>
 
+    <TextBlock x:Name="SharingHeader" Text="SHARING" Style="{StaticResource SectionHeader}"/>
+    <TextBlock Text="Share folder (a full path, such as a OneDrive or Dropbox folder)" Margin="0,0,0,4"/>
+    <DockPanel>
+      <Button Content="Browse…" DockPanel.Dock="Right" Margin="6,0,0,0" Click="BrowseShareFolder_Click"/>
+      <TextBox x:Name="ShareFolderBox" AutomationProperties.Name="Share folder"/>
+    </DockPanel>
+    <TextBlock Text="Link prefix (optional, for the link to copy)" Margin="0,8,0,4"/>
+    <TextBox x:Name="SharePrefixBox" AutomationProperties.Name="Link prefix"/>
+    <TextBlock Text="Upload URL" Margin="0,12,0,4"/>
+    <TextBox x:Name="UploadUrlBox" AutomationProperties.Name="Upload URL"/>
+    <Grid Margin="0,8,0,0">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+      <TextBlock Text="Form field" VerticalAlignment="Center"/>
+      <TextBox x:Name="UploadFieldBox" Grid.Column="1" Margin="0,4"/>
+      <TextBlock Grid.Row="1" Text="Header name" VerticalAlignment="Center"/>
+      <TextBox x:Name="UploadHeaderNameBox" Grid.Row="1" Grid.Column="1" Margin="0,4"/>
+      <TextBlock Grid.Row="2" Text="Header value" VerticalAlignment="Center"/>
+      <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,4">
+        <Button x:Name="ClearHeaderButton" Content="Clear" DockPanel.Dock="Right" Margin="6,0,0,0" Click="ClearHeader_Click"/>
+        <PasswordBox x:Name="UploadHeaderValueBox" AutomationProperties.Name="Header value"/>
+      </DockPanel>
+    </Grid>
+    <TextBlock x:Name="HeaderHint" FontSize="11" Margin="160,0,0,4" Foreground="{StaticResource TextSecondaryBrush}"/>
+    <StackPanel Orientation="Horizontal" Margin="0,4">
+      <TextBlock Text="Link from" Width="160" VerticalAlignment="Center"/>
+      <RadioButton x:Name="LinkBodyRadio" Content="Whole response" GroupName="linkmode" Checked="LinkMode_Changed"/>
+      <RadioButton x:Name="LinkJsonRadio" Content="JSON field" GroupName="linkmode" Checked="LinkMode_Changed"/>
+    </StackPanel>
+    <TextBox x:Name="JsonPathBox" Margin="160,4,0,0" AutomationProperties.Name="JSON field"/>
+    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+      <Button x:Name="TestUploadButton" Content="Test upload" Click="TestUpload_Click"/>
+    </StackPanel>
+    <TextBlock x:Name="ShareError" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+
     <TextBlock Text="PRESETS" Style="{StaticResource SectionHeader}"/>
     <ListBox x:Name="PresetList" Height="120" DisplayMemberPath="Summary" SelectionChanged="PresetList_SelectionChanged"/>
     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">

@@ -63,6 +63,7 @@ public static class SettingsStore
             Hotkeys = Normalize(s.Hotkeys, repeatGiven, pauseGiven, panoramicGiven, presets.Select(p => p.Hotkey).Where(k => k != "")),
             QuickStyles = s.QuickStyles ?? new(),
             Webcam = s.Webcam ?? new(),
+            Share = s.Share ?? new(),
             CaptureDelaySeconds = Math.Clamp(s.CaptureDelaySeconds, 0, 10),
             JpgQuality = Math.Clamp(s.JpgQuality, 1, 100),
             ExportFormat = s.ExportFormat is "jpg" ? "jpg" : "png",

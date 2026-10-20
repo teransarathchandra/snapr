@@ -52,6 +52,7 @@ Turn a busy screenshot into clean wireframe shapes, ready for docs and slides.
 | ✂️ **Trim and GIF** | Cut videos, annotate them and save MP4 or animated GIF |
 | 🗂️ **Library** | Every capture saved, searchable and taggable |
 | 📤 **Export** | PNG, JPG, GIF, BMP, PDF or print. Opens Snagit `.snagx` files too |
+| 🔗 **Share** | Copy to a share folder, upload to your own endpoint, or use Windows Share |
 
 The full list is in [docs/features.md](docs/features.md).
 

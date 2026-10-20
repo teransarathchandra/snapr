@@ -519,6 +519,23 @@ public partial class EditorWindow : Window
     void PrintActual_Click(object sender, RoutedEventArgs e) => Print(fit: false);
     void ExportSnapr_Click(object sender, RoutedEventArgs e) => ExportSnapr();
 
+    void ShareFolder_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Folder);
+    void ShareUpload_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Upload);
+    void ShareWindows_Click(object sender, RoutedEventArgs e) => Share(ShareTarget.Windows);
+
+    void Share_Click(object sender, RoutedEventArgs e)
+    {
+        ShareButton.ContextMenu.PlacementTarget = ShareButton;
+        ShareButton.ContextMenu.IsOpen = true;
+    }
+
+    void Share(ShareTarget target)
+    {
+        if (_doc is null || _path is null) return;
+        Board.CommitTextEditor();
+        _app.Fire(() => _app.ShareAsync(this, target, _path, () => AppController.WriteShareTemp(RenderForExport(), Path.GetFileNameWithoutExtension(_path)), deleteAfter: true));
+    }
+
     void Export_Click(object sender, RoutedEventArgs e)
     {
         ExportButton.ContextMenu.PlacementTarget = ExportButton;

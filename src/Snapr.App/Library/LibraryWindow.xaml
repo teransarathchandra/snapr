@@ -73,6 +73,15 @@
         <Button x:Name="OpenButton" Content="Open" Click="Open_Click"/>
         <Button x:Name="TagsButton" Content="Tags…" Click="Tags_Click"/>
         <Button x:Name="TemplateButton" Content="Template…" Click="Template_Click"/>
+        <Button x:Name="ShareButton" Content="Share ▾" Click="Share_Click">
+          <Button.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Copy to share folder" Click="ShareFolder_Click"/>
+              <MenuItem Header="Upload" Click="ShareUpload_Click"/>
+              <MenuItem Header="Windows Share…" Click="ShareWindows_Click"/>
+            </ContextMenu>
+          </Button.ContextMenu>
+        </Button>
         <Button x:Name="FolderButton" Content="Show in folder" Click="Folder_Click"/>
         <Button x:Name="DeleteButton" Content="Delete" Click="Delete_Click"/>
       </StackPanel>
@@ -128,6 +137,11 @@
                 <MenuItem Header="Open" Click="Open_Click"/>
                 <MenuItem Header="Tags…" Click="Tags_Click"/>
                 <MenuItem Header="Template…" Click="Template_Click"/>
+                <MenuItem Header="Share">
+                  <MenuItem Header="Copy to share folder" Click="ShareFolder_Click"/>
+                  <MenuItem Header="Upload" Click="ShareUpload_Click"/>
+                  <MenuItem Header="Windows Share…" Click="ShareWindows_Click"/>
+                </MenuItem>
                 <MenuItem Header="Show in folder" Click="Folder_Click"/>
                 <MenuItem Header="Delete" Click="Delete_Click"/>
               </ContextMenu>
