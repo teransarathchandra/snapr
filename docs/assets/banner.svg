@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.22" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2563eb" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#2563eb" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+  <rect width="1280" height="320" rx="24" fill="url(#glow)"/>
+  <g transform="translate(150 88) scale(1.5)">
+    <circle cx="48" cy="48" r="46" fill="#2563eb"/>
+    <g stroke="#fff" stroke-width="6.9" stroke-linecap="round">
+      <line x1="76.8" y1="48.0" x2="52.1" y2="76.5"/>
+      <line x1="62.4" y1="72.9" x2="25.4" y2="65.8"/>
+      <line x1="33.6" y1="72.9" x2="21.3" y2="37.3"/>
+      <line x1="19.2" y1="48.0" x2="43.9" y2="19.5"/>
+      <line x1="33.6" y1="23.1" x2="70.6" y2="30.2"/>
+      <line x1="62.4" y1="23.1" x2="74.7" y2="58.7"/>
+    </g>
+  </g>
+  <text x="340" y="170" fill="#ffffff" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-size="88" font-weight="700" letter-spacing="-2">Snapr</text>
+  <text x="344" y="222" fill="#9fb0cc" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-size="28">Capture, annotate, redact and record your screen.</text>
+  <text x="344" y="262" fill="#60a5fa" font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif" font-size="22" font-weight="600">Free · Open source · One portable .exe for Windows</text>
+</svg>
