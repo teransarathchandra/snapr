@@ -14,12 +14,26 @@ public static class TagRules
         {
             if (raw is null) continue;
             var t = raw.Replace(",", "").Trim();
-            if (t.Length > MaxLength) t = t[..MaxLength].Trim();
+            if (t.Length > MaxLength) t = Cut(t).Trim();
             if (t.Length == 0 || result.Contains(t, Same)) continue;
             result.Add(t);
             if (result.Count == MaxTags) break;
         }
         return result;
+    }
+
+    /// <summary>At most MaxLength UTF-16 units, ending on a whole text element (emoji, accented letters stay intact).</summary>
+    static string Cut(string t)
+    {
+        var end = 0;
+        foreach (var start in System.Globalization.StringInfo.ParseCombiningCharacters(t))
+        {
+            if (start > MaxLength) break;
+            end = start;
+        }
+        // end = start of the last element beginning at or before MaxLength; include it only if it ends by MaxLength
+        var elementEnd = System.Globalization.StringInfo.GetNextTextElementLength(t, end) + end;
+        return t[..(elementEnd <= MaxLength ? elementEnd : end)];
     }
 
     /// <summary>The Tags dialog's text: tags separated by commas.</summary>

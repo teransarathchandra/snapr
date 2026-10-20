@@ -11,6 +11,7 @@ using Snapr.App.Services;
 using Snapr.Core;
 using Snapr.Core.Recording;
 using Snapr.Core.Video;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Video;
 
@@ -54,6 +55,7 @@ public sealed class VideoEditorWindow : Window
 
     public VideoEditorWindow(AppController app, string file)
     {
+        DarkTitleBar.Attach(this);
         _app = app;
         _file = file;
         Title = $"{Path.GetFileName(file)} – Snapr video";

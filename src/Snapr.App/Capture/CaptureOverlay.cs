@@ -34,6 +34,7 @@ sealed class CaptureOverlay : Window
 
     public CaptureOverlay(OverlaySession session, Rct monitor)
     {
+        DarkTitleBar.Attach(this);
         _session = session;
         Monitor = monitor;
         WindowStyle = WindowStyle.None;

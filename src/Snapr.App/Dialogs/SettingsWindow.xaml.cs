@@ -11,6 +11,7 @@ using Snapr.Core;
 using Snapr.Core.Output;
 using Snapr.Core.Recording;
 using Snapr.Core.Settings;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -28,6 +29,7 @@ public partial class SettingsWindow : Window
     {
         _app = app;
         InitializeComponent();
+        DarkTitleBar.Attach(this);
         MaxHeight = SystemParameters.WorkArea.Height;
         Icon = AppIcon.Render(64);
         var s = app.Settings;
@@ -112,7 +114,8 @@ public partial class SettingsWindow : Window
 
     /// <summary>The upload values as entered: a typed header value replaces the saved one (protected in memory).</summary>
     UploadSettings TypedUpload() => new(UploadUrlBox.Text.Trim(), NullIfEmpty(UploadFieldBox.Text) ?? "file", NullIfEmpty(UploadHeaderNameBox.Text),
-        UploadHeaderValueBox.Password.Length > 0 ? SecretStore.Protect(UploadHeaderValueBox.Password) : _savedHeader,
+        NullIfEmpty(UploadHeaderNameBox.Text) is null ? null   // no header name: a value would never be sent
+            : UploadHeaderValueBox.Password.Length > 0 ? SecretStore.Protect(UploadHeaderValueBox.Password) : _savedHeader,
         LinkMode, LinkMode == UploadLinkMode.JsonField ? NullIfEmpty(JsonPathBox.Text) : null);
 
     void ShowShareError(string? message)
@@ -123,7 +126,7 @@ public partial class SettingsWindow : Window
 
     async void TestUpload_Click(object sender, RoutedEventArgs e)
     {
-        var error = ShareRules.UploadUrlError(UploadUrlBox.Text) ?? ShareRules.JsonPathError(LinkMode, JsonPathBox.Text);
+        var error = ShareRules.UploadUrlError(UploadUrlBox.Text) ?? ShareRules.JsonPathError(LinkMode, JsonPathBox.Text) ?? ShareRules.HeaderNameError(UploadHeaderNameBox.Text.Trim());
         ShowShareError(error);
         if (error is not null) return;
         var upload = TypedUpload();
@@ -319,7 +322,7 @@ public partial class SettingsWindow : Window
             MessageBox.Show(this, "Each action needs a different hotkey.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var shareError = ShareSetup.Validate(ShareFolderBox.Text, SharePrefixBox.Text, UploadUrlBox.Text, LinkMode, JsonPathBox.Text);
+        var shareError = ShareSetup.Validate(ShareFolderBox.Text, SharePrefixBox.Text, UploadUrlBox.Text, LinkMode, JsonPathBox.Text, UploadHeaderNameBox.Text.Trim());
         ShowShareError(shareError);
         if (shareError is not null)
         {

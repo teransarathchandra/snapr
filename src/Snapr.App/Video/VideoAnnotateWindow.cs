@@ -8,6 +8,7 @@ using System.Windows.Threading;
 using Snapr.App.Editor;
 using Snapr.App.Rendering;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Video;
 
@@ -34,6 +35,7 @@ public sealed class VideoAnnotateWindow : Window
 
     public VideoAnnotateWindow(Window? owner, BitmapSource frame, IReadOnlyList<Annotation> visible, ToolStyle style)
     {
+        DarkTitleBar.Attach(this);
         Title = "Annotate frame";
         Style = (System.Windows.Style)Application.Current.FindResource("SnaprWindow");
         WindowState = WindowState.Maximized;
@@ -55,6 +57,7 @@ public sealed class VideoAnnotateWindow : Window
         left.Children.Add(_shapeRow);
         left.Children.Add(SwatchRow());
         left.Children.Add(SizeSlider());
+        left.Children.Add(TextSizeSlider());
         var delete = new Button { Content = "Delete", ToolTip = "Delete the selected objects (Del)" };
         delete.Click += (_, _) => _board.DeleteSelected();
         left.Children.Add(delete);
@@ -143,10 +146,21 @@ public sealed class VideoAnnotateWindow : Window
     StackPanel SizeSlider()
     {
         var slider = new Slider { Minimum = 1, Maximum = 20, Value = Math.Clamp(_board.CurrentStyle.Width, 1, 20), Width = 120, SmallChange = 0.5, LargeChange = 2, VerticalAlignment = VerticalAlignment.Center };
-        AutomationProperties.SetName(slider, "Size");
+        AutomationProperties.SetName(slider, "Line width");
         slider.ValueChanged += (_, e) => ChangeStyle(s => s with { Width = Math.Round(e.NewValue, 1) }, "width");
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0) };
-        row.Children.Add(new TextBlock { Text = "Size", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), Foreground = (Brush)Application.Current.FindResource("TextSecondaryBrush") });
+        row.Children.Add(new TextBlock { Text = "Line width", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), Foreground = (Brush)Application.Current.FindResource("TextSecondaryBrush") });
+        row.Children.Add(slider);
+        return row;
+    }
+
+    StackPanel TextSizeSlider()
+    {
+        var slider = new Slider { Minimum = 10, Maximum = 72, Value = Math.Clamp(_board.CurrentStyle.FontSize, 10, 72), Width = 120, SmallChange = 1, LargeChange = 4, VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(slider, "Text size");
+        slider.ValueChanged += (_, e) => ChangeStyle(s => s with { FontSize = Math.Round(e.NewValue) }, "fontsize");
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 12, 0) };
+        row.Children.Add(new TextBlock { Text = "Text size", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0), Foreground = (Brush)Application.Current.FindResource("TextSecondaryBrush") });
         row.Children.Add(slider);
         return row;
     }

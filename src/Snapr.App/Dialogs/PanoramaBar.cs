@@ -20,6 +20,7 @@ public sealed class PanoramaBar : Window
 
     public PanoramaBar(Rct screenArea)
     {
+        DarkTitleBar.Attach(this);
         _area = screenArea;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;

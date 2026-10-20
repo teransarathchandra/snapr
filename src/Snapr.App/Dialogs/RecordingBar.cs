@@ -22,8 +22,9 @@ public sealed class RecordingBar : Window
     readonly Stopwatch _elapsed = Stopwatch.StartNew();
     readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
-    public RecordingBar(AppController app, Rct screenRect, bool micUnavailable, bool hasCamera = false)
+    public RecordingBar(AppController app, Rct screenRect, bool micUnavailable, bool hasCamera = false, bool micFallback = false)
     {
+        DarkTitleBar.Attach(this);
         _area = screenRect;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -45,12 +46,12 @@ public sealed class RecordingBar : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(new Ellipse { Width = 10, Height = 10, Fill = ImageIo.Brush("#FFEF4444"), VerticalAlignment = VerticalAlignment.Center });
         row.Children.Add(_time);
-        if (micUnavailable)
+        if (micUnavailable || micFallback)
             row.Children.Add(new Border
             {
                 Background = ImageIo.Brush("#FF7F1D1D"), CornerRadius = new CornerRadius(4), Padding = new Thickness(6, 2, 6, 2),
                 Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center,
-                Child = new TextBlock { Text = "No mic", Foreground = Brushes.White, FontSize = 11 },
+                Child = new TextBlock { Text = micUnavailable ? "No mic" : "Default mic", Foreground = Brushes.White, FontSize = 11 },
             });
         if (hasCamera)
         {

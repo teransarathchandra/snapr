@@ -42,6 +42,8 @@ public sealed class RecorderService : IDisposable
     public string WorkDirectory { get; }
     public bool IsPaused => _paused;
     public bool MicUnavailable { get; private set; }
+    /// <summary>The chosen microphone failed and the default one is being used.</summary>
+    public bool MicFallback { get; private set; }
 
     /// <summary>ffmpeg exited without being asked to; the argument is its last output lines. Raised on a thread-pool thread.</summary>
     public event Action<string>? Failed;
@@ -80,10 +82,13 @@ public sealed class RecorderService : IDisposable
         StartSegment();
     }
 
-    public async Task<string> StopAsync()
+    /// <param name="grabStopped">Called once right after the screen grab and audio have stopped, before concat/mux. Runs on the calling thread.</param>
+    public async Task<string> StopAsync(Action? grabStopped = null)
     {
         if (!_paused) StopSegment();
         StopAudio();
+        try { grabStopped?.Invoke(); }
+        catch (Exception ex) { Log.Write("Stop callback failed", ex); }
 
         var segments = _segments.Where(s => File.Exists(s) && new FileInfo(s).Length > 0).ToList();
         if (segments.Count == 0) throw new RecorderException($"ffmpeg did not record any video.\n\n{LastErrors()}");
@@ -222,22 +227,40 @@ public sealed class RecorderService : IDisposable
         }
         if (_options.Microphone)
         {
+            var attempt = MicChoice.Next(_options.MicDeviceId, false);
             try
             {
-                using var devices = new MMDeviceEnumerator();
-                var device = _options.MicDeviceId is { } id ? devices.GetDevice(id) : devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
-                _mic = new WasapiCapture(device);
-                _micWriter = new WaveFileWriter(MicPath, _mic.WaveFormat);
-                _mic.DataAvailable += (_, e) => { lock (_audioLock) if (_videoRunning) _micWriter?.Write(e.Buffer, 0, e.BytesRecorded); };
-                _mic.StartRecording();
+                OpenMic(attempt);
             }
             catch (Exception ex) when (ex is COMException or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
             {
-                Log.Write("Microphone unavailable; recording without it", ex);
-                MicUnavailable = true;
                 DisposeMic();
+                try
+                {
+                    if (MicChoice.Next(_options.MicDeviceId, true) != MicAttempt.Default) throw;
+                    Log.Write("Chosen microphone unavailable; using the default", ex);
+                    OpenMic(MicAttempt.Default);
+                    MicFallback = true;
+                }
+                catch (Exception ex2) when (ex2 is COMException or InvalidOperationException or ArgumentException or UnauthorizedAccessException)
+                {
+                    Log.Write("Microphone unavailable; recording without it", ex2);
+                    MicUnavailable = true;
+                    MicFallback = false;
+                    DisposeMic();
+                }
             }
         }
+    }
+
+    void OpenMic(MicAttempt attempt)
+    {
+        using var devices = new MMDeviceEnumerator();
+        var device = attempt == MicAttempt.Chosen ? devices.GetDevice(_options.MicDeviceId!) : devices.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+        _mic = new WasapiCapture(device);
+        _micWriter = new WaveFileWriter(MicPath, _mic.WaveFormat);
+        _mic.DataAvailable += (_, e) => { lock (_audioLock) if (_videoRunning) _micWriter?.Write(e.Buffer, 0, e.BytesRecorded); };
+        _mic.StartRecording();
     }
 
     void StopAudio()

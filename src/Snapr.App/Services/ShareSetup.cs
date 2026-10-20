@@ -16,10 +16,10 @@ public static class ShareSetup
     };
 
     /// <summary>The first error for the entered values; folder checks only when a folder is entered, upload checks only when an upload URL is entered.</summary>
-    public static string? Validate(string? folder, string? prefix, string? uploadUrl, UploadLinkMode mode, string? jsonPath)
+    public static string? Validate(string? folder, string? prefix, string? uploadUrl, UploadLinkMode mode, string? jsonPath, string? headerName = null)
     {
         if (!string.IsNullOrWhiteSpace(folder) && (ShareRules.FolderError(folder) ?? ShareRules.PrefixError(prefix)) is { } e) return e;
-        if (!string.IsNullOrWhiteSpace(uploadUrl) && (ShareRules.UploadUrlError(uploadUrl) ?? ShareRules.JsonPathError(mode, jsonPath)) is { } e2) return e2;
+        if (!string.IsNullOrWhiteSpace(uploadUrl) && (ShareRules.UploadUrlError(uploadUrl) ?? ShareRules.JsonPathError(mode, jsonPath) ?? ShareRules.HeaderNameError(headerName)) is { } e2) return e2;
         return null;
     }
 }

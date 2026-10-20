@@ -56,6 +56,7 @@ public partial class EditorWindow : Window
     {
         _app = app;
         InitializeComponent();
+        DarkTitleBar.Attach(this);
         Icon = AppIcon.Render(64);
         LogoImage.Source = AppIcon.Render(40);
         _autosave.Tick += (_, _) => { _autosave.Stop(); SaveNow(); };
@@ -661,9 +662,9 @@ public partial class EditorWindow : Window
                     Log.Write("Simplify: reading text failed", ex);
                     if (options.Text) MessageBox.Show(this, $"Snapr couldn't read the text: {ex.Message}", "Simplify", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
-                if (Stale()) return;
+                if (Stale()) { ShowNotice(SimplifyService.ViewChangedNotice); return; }
                 var shapes = await Task.Run(() => SimplifyService.Build(visible, new Rct(area.X, area.Y, area.Width, area.Height), lines, options));
-                if (Stale()) return;
+                if (Stale()) { ShowNotice(SimplifyService.ViewChangedNotice); return; }
                 if (SimplifyService.Notice(options, noOcr, shapes.Count > 0) is { } notice) ShowNotice(notice);
                 if (shapes.Count == 0) return;
                 Board.Apply(s => s with { Annotations = [.. SimplifyService.PlaceUnder(s.Annotations, shapes)] });

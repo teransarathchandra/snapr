@@ -44,6 +44,15 @@ public sealed class PanoramaStitcher(int maxSide = 32000, long maxPixels = 100_0
         if (frame.Pixels.AsSpan().SequenceEqual(_last.Pixels)) return PanoramaAdd.Skipped;
 
         var pyramid = Pyramid(frame);
+        if (_count == 1 && IsBlank(_prev[0]))
+        {
+            // The first frame had nothing to match against (spec parity 20 §4.12): start over from this one.
+            _tiles.Clear();
+            Paint(frame, 0, 0);
+            (_last, _lastX, _lastY, _prev) = (frame, 0, 0, pyramid);
+            (_minX, _minY, _maxX, _maxY) = (0, 0, frame.Width, frame.Height);
+            return PanoramaAdd.Added;
+        }
         if (Match(_prev, pyramid) is not { } d)
         {
             LostParts = true;
@@ -102,6 +111,8 @@ public sealed class PanoramaStitcher(int maxSide = 32000, long maxPixels = 100_0
     // ---- Matching ----
 
     readonly record struct Grey(int W, int H, byte[] P);
+
+    static bool IsBlank(Grey g) { byte lo = 255, hi = 0; foreach (var v in g.P) { if (v < lo) lo = v; if (v > hi) hi = v; } return hi - lo < 8; }
 
     static Grey[] Pyramid(Frame f)
     {

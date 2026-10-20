@@ -69,10 +69,9 @@ The full list is in [docs/features.md](docs/features.md).
    curl.exe -LO https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe
    .\Snapr.exe
    ```
+   > [!NOTE]
+   > Snapr.exe isn't code-signed yet, so on first run Windows SmartScreen may say "Windows protected your PC". Choose **More info → Run anyway**. You can check the download against `Snapr.exe.sha256` on the release page.
 2. Snapr starts in the tray. Press <kbd>Print Screen</kbd> and drag an area.
-
-> [!NOTE]
-> The exe is not code-signed yet. If Windows SmartScreen appears, click **More info → Run anyway**.
 
 **Needs:** Windows 10 1903+ or Windows 11 (x64). Video recording also needs [ffmpeg](https://ffmpeg.org/download.html) on your `PATH` (or set its location in Settings).
 

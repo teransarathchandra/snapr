@@ -28,6 +28,7 @@ public sealed class WebcamBubble : Window
 
     public WebcamBubble(WebcamService camera, Rct screenArea, WebcamSettings settings)
     {
+        DarkTitleBar.Attach(this);
         _area = screenArea;
         var r = WebcamLayout.Place(screenArea, WebcamLayout.Pixels(settings.Size), settings.Shape);
         Placed = r is not null;

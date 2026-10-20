@@ -22,6 +22,9 @@ public class SimplifyServiceTests
     static readonly TextLine Line = new([new TextWord("Hi", new Rct(150, 110, 30, 10))]);
 
     [Fact]
+    public void View_changed_notice() => Assert.Equal("The view changed while Simplify was working, so nothing was added. Run it again.", SimplifyService.ViewChangedNotice);
+
+    [Fact]
     public void Notices()
     {
         var both = SimplifyOptions.Default;

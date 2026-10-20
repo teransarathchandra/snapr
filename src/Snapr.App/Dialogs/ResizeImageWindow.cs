@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -20,6 +21,7 @@ public sealed class ResizeImageWindow : Window
 
     public ResizeImageWindow(Window owner, int width, int height)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Resize image";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

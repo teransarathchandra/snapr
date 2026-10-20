@@ -12,6 +12,7 @@ public sealed record SimplifyOptions(bool Text, bool Blocks, bool PlainBackgroun
 /// <summary>Simplify (spec parity 15 §4): blocks become flat boxes, text lines rounded bars, all in one group.</summary>
 public static class SimplifyService
 {
+    public const string ViewChangedNotice = "The view changed while Simplify was working, so nothing was added. Run it again.";
     const string NoOcrNotice = "Windows has no text recognition language, so text was left as is.";
 
     /// <summary>The editor notice after a run, or null (spec parity 15 §4, parity 16 §3.7).</summary>

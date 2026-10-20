@@ -60,8 +60,19 @@ public class TemplateServiceTests
     [Fact]
     public void Grid_captions_come_from_titles() => Sta.Run(() =>
     {
-        var output = TemplateService.Build(TemplateKind.GridCaptions, [Solid(10, 10), Solid(10, 10)], ["Notepad", null], "#FFFFFFFF")!;
+        var output = TemplateService.Build(TemplateKind.GridCaptions, [Solid(200, 100), Solid(200, 100)], ["Notepad", null], "#FFFFFFFF")!;
         Assert.Equal(["Title", "Notepad", "Caption"], output.Objects.OfType<TextAnnotation>().Select(t => t.Text));
+    });
+
+    [Fact]
+    public void Long_grid_caption_is_fitted_to_its_picture() => Sta.Run(() =>
+    {
+        var output = TemplateService.Build(TemplateKind.GridCaptions, [Solid(200, 100), Solid(200, 100)], [new string('W', 300), null], "#FFFFFFFF")!;
+        var caption = output.Objects.OfType<TextAnnotation>().First(t => t.Text.StartsWith('W')).Text;
+        Assert.EndsWith("…", caption);
+        var ft = new System.Windows.Media.FormattedText(caption, System.Globalization.CultureInfo.CurrentUICulture, System.Windows.FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), System.Windows.FontStyles.Normal, System.Windows.FontWeights.Normal, System.Windows.FontStretches.Normal), 16, Brushes.Black, 1.0);
+        Assert.True(ft.WidthIncludingTrailingWhitespace <= 200);
     });
 
     [Fact]

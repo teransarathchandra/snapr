@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -12,6 +13,7 @@ public sealed class TagsWindow : Window
 
     public TagsWindow(Window owner, IReadOnlyList<string> shared)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Tags";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

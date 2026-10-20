@@ -4,6 +4,7 @@ using System.Windows.Media;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -39,6 +40,7 @@ public sealed class RedactWindow : Window
 
     public RedactWindow(Window owner, Func<Task<IReadOnlyList<TextLine>>> read, bool largeImage = false, RedactLook? look = null)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Redact";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

@@ -31,6 +31,13 @@ public static class ShareRules
     public static string? JsonPathError(UploadLinkMode mode, string? path) =>
         mode == UploadLinkMode.JsonField && string.IsNullOrWhiteSpace(path) ? "Enter the JSON field that holds the link, such as data.link." : null;
 
+    const string TokenChars = "!#$%&'*+-.^_`|~";
+
+    public static string? HeaderNameError(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? null
+        : name.Trim().All(c => c < 128 && (char.IsAsciiLetterOrDigit(c) || TokenChars.Contains(c))) ? null
+        : "Use a header name without spaces, such as Authorization or X-Api-Key.";
+
     internal static bool IsWebLink(string? s) => s is not null && Uri.TryCreate(s, UriKind.Absolute, out var u) && IsWeb(u);
 }
 

@@ -44,14 +44,25 @@ public sealed partial class AppController
                 Notify("Area too small", "Select at least 16 × 16 pixels to record.");
                 return;
             }
-            await CountdownWindow.RunAsync(3);
-            if (_settings.Webcam.Enabled) await StartWebcamAsync(screen);
+            // The camera opens while the countdown runs; the countdown can't be cancelled, but it can throw.
+            var opening = Stopwatch.StartNew();
+            var cameraOpen = _settings.Webcam.Enabled ? WebcamService.OpenAsync(_settings.Webcam.DeviceId) : null;
+            try
+            {
+                await CountdownWindow.RunAsync(3);
+            }
+            catch
+            {
+                if (cameraOpen is not null) DisposeLateCamera(cameraOpen);
+                throw;
+            }
+            if (cameraOpen is not null) await StartWebcamAsync(screen, cameraOpen, TimeSpan.FromSeconds(5) - opening.Elapsed);
             var recorder = new RecorderService(new RecorderService.Options(ffmpeg, screen, _settings.RecordSystemAudio,
                 _settings.RecordMicrophone, _settings.MicDeviceId, CapturePaths.NewVideoPath(CapturePaths.VideosRoot, DateTime.Now)));
             recorder.Failed += errors => Application.Current.Dispatcher.BeginInvoke(() => Fire(() => StopRecordingAsync(errors)));
             recorder.Start();
             _recorder = recorder;
-            _bar = new RecordingBar(this, screen, recorder.MicUnavailable, hasCamera: _bubble is not null);
+            _bar = new RecordingBar(this, screen, recorder.MicUnavailable, hasCamera: _bubble is not null, micFallback: recorder.MicFallback);
             _bar.Show();
             _tray.SetRecording(true, false);
         }
@@ -62,18 +73,22 @@ public sealed partial class AppController
         }
     }
 
-    async Task StartWebcamAsync(Rct screen)
+    /// <summary>Disposes a camera that is still opening and will not be used.</summary>
+    static void DisposeLateCamera(Task<WebcamService> open) =>
+        _ = open.ContinueWith(t =>
+        {
+            if (t.IsCompletedSuccessfully) _ = t.Result.DisposeAsync();
+            else Log.Write("Webcam: late open failed", t.Exception);
+        }, TaskScheduler.FromCurrentSynchronizationContext());
+
+    async Task StartWebcamAsync(Rct screen, Task<WebcamService> open, TimeSpan remaining)
     {
         const string title = "Snapr couldn't open the camera";
-        var open = WebcamService.OpenAsync(_settings.Webcam.DeviceId);
-        if (await Task.WhenAny(open, Task.Delay(5000)) != open)
+        if (remaining < TimeSpan.Zero) remaining = TimeSpan.Zero;
+        if (await Task.WhenAny(open, Task.Delay(remaining)) != open)
         {
             Notify(title, "The camera took too long to start.");
-            _ = open.ContinueWith(t =>
-            {
-                if (t.IsCompletedSuccessfully) _ = t.Result.DisposeAsync();
-                else Log.Write("Webcam: late open failed", t.Exception);
-            }, TaskScheduler.FromCurrentSynchronizationContext());
+            DisposeLateCamera(open);
             return;
         }
         WebcamService camera;
@@ -151,11 +166,13 @@ public sealed partial class AppController
         _recorder = null;
         _bar?.Close();
         _bar = null;
-        StopWebcam();
         _tray.SetRecording(false, false);
+        var camera = _camera;   // this recording's camera; a new recording may start while this one is still muxing
         try
         {
-            var path = await recorder.StopAsync();
+            // The camera bubble stays until the screen grab has stopped. StopAsync awaits on the UI thread,
+            // so the callback runs there too (StopWebcam touches a window); Dispatcher.Invoke covers any other thread.
+            var path = await recorder.StopAsync(() => Application.Current.Dispatcher.Invoke(StopWebcam));
             recorder.Dispose();
             _editor?.RefreshRecents();
             if (failure is not null)
@@ -173,6 +190,10 @@ public sealed partial class AppController
             recorder.Dispose();
             MessageBox.Show($"The recording could not be saved.\n\n{ex.Message}\n\nThe recorded pieces were kept in:\n{recorder.WorkDirectory}",
                 "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            if (camera is not null && ReferenceEquals(_camera, camera)) StopWebcam();   // StopAsync threw before grabStopped
         }
     }
 

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -21,6 +22,7 @@ public sealed class CanvasSizeWindow : Window
 
     public CanvasSizeWindow(Window owner, int width, int height, string currentColor)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Canvas size";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

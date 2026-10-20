@@ -5,6 +5,7 @@ using System.Windows.Media;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -19,6 +20,7 @@ public sealed class CombineWindow : Window
 
     public CombineWindow(Window owner, IReadOnlyList<string> swatches, CombineChoice initial)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Combine images";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

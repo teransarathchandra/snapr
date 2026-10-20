@@ -6,6 +6,7 @@ using Microsoft.Win32;
 using Snapr.App.Services;
 using Snapr.Core;
 using Snapr.Core.Settings;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -38,6 +39,7 @@ public sealed class PresetEditorWindow : Window
     public PresetEditorWindow(Window owner, AppController app, CapturePreset? existing, IReadOnlyList<CapturePreset> others,
         Func<HotkeySettings> appHotkeys, Action<CapturePreset> saved)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = existing is null ? "New preset" : "Edit preset";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Snapr.App.Rendering;
 using Snapr.App.Services;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -23,6 +24,7 @@ public sealed class SimplifyWindow : Window
 
     public SimplifyWindow(Window owner, IReadOnlyList<(string Color, string Name)> swatches, SimplifyOptions initial)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Simplify";
         Style = (Style)Application.Current.FindResource("SnaprWindow");

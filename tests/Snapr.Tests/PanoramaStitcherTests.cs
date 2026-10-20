@@ -161,4 +161,25 @@ public class PanoramaStitcherTests
         var s = new PanoramaStitcher();
         Assert.Equal((0, 0, 0), (s.Frames, s.Width, s.Height));
     }
+
+    [Fact]
+    public void Blank_first_frame_is_replaced_by_the_first_real_one()
+    {
+        var s = new PanoramaStitcher();
+        Assert.Equal(PanoramaAdd.Added, s.Add(Plain(0xFFFFFFFF)));
+        Assert.Equal(PanoramaAdd.Added, s.Add(Cut(0, 0)));
+        Assert.Equal(PanoramaAdd.Added, s.Add(Cut(60, 0)));
+        Assert.Equal(W + 60, s.Width);
+        Assert.False(s.LostParts);
+    }
+
+    [Fact]
+    public void Two_blank_frames_keep_waiting()
+    {
+        var s = new PanoramaStitcher();
+        s.Add(Plain(0xFFFFFFFF));
+        Assert.Equal(PanoramaAdd.Added, s.Add(Plain(0xFFF0F0F0)));
+        Assert.False(s.LostParts);
+        Assert.Equal(1, s.Frames);
+    }
 }

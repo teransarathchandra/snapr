@@ -13,6 +13,7 @@ using Snapr.App.Rendering;
 using Snapr.App.Services;
 using Snapr.Core;
 using Snapr.Core.Video;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Library;
 
@@ -33,6 +34,7 @@ public partial class LibraryWindow : Window
     {
         _app = app;
         InitializeComponent();
+        DarkTitleBar.Attach(this);
         _typing.Tick += (_, _) =>
         {
             _typing.Stop();
@@ -42,6 +44,7 @@ public partial class LibraryWindow : Window
         Activated += (_, _) => { if (IsLoaded) Rescan(); };   // Show() activates before Loaded, which scans
         Closed += (_, _) =>
         {
+            _closed = true;
             _typing.Stop();
             _load?.Cancel();
         };
@@ -52,17 +55,52 @@ public partial class LibraryWindow : Window
 
     const string ScanFailed = "Some folders couldn't be read.";
 
-    void Rescan()
+    // One scan at a time; a request meanwhile sets _rescan so exactly one more follows. LibraryIndex is touched
+    // only by that scan, so no locking: Forget requests wait in _forget and are applied here, on the UI thread, while no scan runs.
+    bool _scanning, _rescan, _closed;
+    readonly List<string> _forget = [];
+
+    async void Rescan()
     {
-        IReadOnlyList<LibraryItem> next;
-        try { next = _index.Scan([CapturePaths.PicturesRoot, CapturePaths.VideosRoot]); }
+        if (_scanning)
+        {
+            _rescan = true;
+            return;
+        }
+        _scanning = true;
+        UpdateButtons();   // Tags and Delete wait while a scan may be reading the files
+        foreach (var path in _forget) _index.Forget(path);
+        _forget.Clear();
+        if (!_built) Status.Text = "Loading…";
+        IReadOnlyList<LibraryItem>? next = null;
+        try { next = await Task.Run(() => _index.Scan([CapturePaths.PicturesRoot, CapturePaths.VideosRoot])); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // No dialog: it would re-activate this window and rescan in a loop.
             Log.Write("Library: couldn't scan", ex);
-            Status.Text = ScanFailed;
-            return;
+            if (!_closed) Status.Text = ScanFailed;
         }
+        catch (Exception ex)
+        {
+            Log.Write("Library: scan failed", ex);
+            if (!_closed) Status.Text = ScanFailed;
+        }
+        finally
+        {
+            _scanning = false;
+        }
+        if (_closed) return;
+        UpdateButtons();
+        if (next is not null) Apply(next);
+        if (_rescan)
+        {
+            _rescan = false;
+            Rescan();
+        }
+    }
+
+    void Apply(IReadOnlyList<LibraryItem> next)
+    {
         var hadError = Status.Text == ScanFailed;
         // Every save changes the modified time, so an unchanged list means nothing to redraw (and the selection stays).
         if (_built && next.Count == _all.Count && next.Zip(_all).All(p => p.First.Path == p.Second.Path && p.First.ModifiedUtc == p.Second.ModifiedUtc && p.First.Unreadable == p.Second.Unreadable))
@@ -145,8 +183,10 @@ public partial class LibraryWindow : Window
     void UpdateButtons()
     {
         var sel = Selected;
-        OpenButton.IsEnabled = FolderButton.IsEnabled = DeleteButton.IsEnabled = sel.Count > 0;
-        TagsButton.IsEnabled = TemplateButton.IsEnabled = sel.Count > 0 && sel.All(i => !i.IsVideo && !i.Unreadable);
+        OpenButton.IsEnabled = FolderButton.IsEnabled = sel.Count > 0;
+        DeleteButton.IsEnabled = sel.Count > 0 && !_scanning;
+        TemplateButton.IsEnabled = sel.Count > 0 && sel.All(i => !i.IsVideo && !i.Unreadable);
+        TagsButton.IsEnabled = TemplateButton.IsEnabled && !_scanning;
         ShareButton.IsEnabled = sel is [{ Unreadable: false }];
     }
 
@@ -219,7 +259,7 @@ public partial class LibraryWindow : Window
                 }
             }
             else if (inEditor == false) failed.Add(Path.GetFileName(item.Path));
-            _index.Forget(item.Path);
+            _forget.Add(item.Path);
         }
         if (failed.Count > 0)
             MessageBox.Show(this, $"Snapr couldn't save tags for: {string.Join(", ", failed)}", "Tags", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -273,7 +313,7 @@ public partial class LibraryWindow : Window
     void Delete_Click(object sender, RoutedEventArgs e)
     {
         var sel = Selected;
-        if (sel.Count == 0) return;
+        if (sel.Count == 0 || !DeleteButton.IsEnabled) return;
         var what = sel.Count == 1 ? "1 item" : $"{sel.Count} items";
         if (MessageBox.Show(this, $"Move {what} to the Recycle Bin?", "Delete", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
 

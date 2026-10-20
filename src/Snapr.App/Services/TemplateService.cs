@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Windows;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Snapr.App.Rendering;
 using Snapr.Core;
@@ -21,6 +24,11 @@ public static class TemplateService
         return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255 < 0.5;
     }
 
+    /// <summary>Text width in DIPs, drawn the way <c>DocumentRenderer</c> draws a TextAnnotation (pixelsPerDip 1).</summary>
+    static double Measure(string s, double size, bool bold) => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight,
+        new Typeface(new FontFamily(Font), FontStyles.Normal, bold ? FontWeights.Bold : FontWeights.Normal, FontStretches.Normal),
+        size, Brushes.Black, 1.0).WidthIncludingTrailingWhitespace;
+
     public static TemplateOutput? Build(TemplateKind kind, IReadOnlyList<BitmapSource> pictures, IReadOnlyList<string?> titles, string background)
     {
         var dark = IsDark(background);
@@ -37,8 +45,15 @@ public static class TemplateService
         foreach (var slot in layout.Texts)
         {
             var isTitle = slot.Role == TextRole.Title;
-            var text = new TextAnnotation(slot.Position, TemplateTexts.For(kind, slot, titles), Font,
-                isTitle ? TemplateLayout.TitleSize : TemplateLayout.SmallSize, isTitle, colour);
+            var size = isTitle ? TemplateLayout.TitleSize : TemplateLayout.SmallSize;
+            var limit = slot.Role switch
+            {
+                TextRole.Label or TextRole.Caption when kind != TemplateKind.StepByStep => layout.Pictures[slot.Index].W,
+                TextRole.Caption => layout.Width - (TemplateLayout.Margin + 48) - TemplateLayout.Margin,
+                _ => layout.Width - 2 * TemplateLayout.Margin,
+            };
+            var text = new TextAnnotation(slot.Position, TemplateTexts.Fit(TemplateTexts.For(kind, slot, titles), limit, s => Measure(s, size, isTitle)), Font,
+                size, isTitle, colour);
             title ??= isTitle ? text : null;
             objects.Add(text);
         }

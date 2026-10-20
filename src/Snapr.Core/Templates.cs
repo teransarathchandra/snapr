@@ -112,4 +112,17 @@ public static class TemplateTexts
             slot.Index < sourceTitles.Count && !string.IsNullOrWhiteSpace(sourceTitles[slot.Index]) ? sourceTitles[slot.Index]!.Trim() : "Caption",
         _ => $"Step {slot.Index + 1}",
     };
+
+    /// <summary>The text, or its longest whole-character prefix plus "…" that fits maxWidth (spec parity 20 §4.9).</summary>
+    public static string Fit(string text, double maxWidth, Func<string, double> measure)
+    {
+        if (measure(text) <= maxWidth) return text;
+        var starts = System.Globalization.StringInfo.ParseCombiningCharacters(text);
+        for (var n = starts.Length - 1; n > 0; n--)
+        {
+            var candidate = text[..starts[n]].TrimEnd() + "…";
+            if (measure(candidate) <= maxWidth) return candidate;
+        }
+        return "…";
+    }
 }

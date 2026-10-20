@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Snapr.App.Services;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -9,6 +10,7 @@ public sealed class TextResultWindow : Window
 {
     TextResultWindow(string text)
     {
+        DarkTitleBar.Attach(this);
         Title = "Snapr – Grab Text";
         Style = (Style)Application.Current.FindResource("SnaprWindow");
         Width = 520;

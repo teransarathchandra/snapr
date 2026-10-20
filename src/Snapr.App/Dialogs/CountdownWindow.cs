@@ -19,6 +19,7 @@ public sealed class CountdownWindow : Window
 
     CountdownWindow()
     {
+        DarkTitleBar.Attach(this);
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;

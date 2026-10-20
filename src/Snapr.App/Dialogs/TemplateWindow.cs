@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using Snapr.App.Rendering;
 using Snapr.Core;
+using Snapr.App.Platform;
 
 namespace Snapr.App.Dialogs;
 
@@ -30,6 +31,7 @@ public sealed class TemplateWindow : Window
 
     public TemplateWindow(Window owner, int count, IReadOnlyList<string> swatches, TemplateChoice initial)
     {
+        DarkTitleBar.Attach(this);
         Owner = owner;
         Title = "Template";
         Style = (Style)Application.Current.FindResource("SnaprWindow");
