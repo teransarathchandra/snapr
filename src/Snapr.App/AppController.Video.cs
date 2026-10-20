@@ -8,6 +8,8 @@ public sealed partial class AppController
 {
     readonly Dictionary<string, VideoEditorWindow> _videoEditors = new(StringComparer.OrdinalIgnoreCase);
 
+    public bool IsOpenInVideoEditor(string file) => _videoEditors.ContainsKey(Path.GetFullPath(file));
+
     public void ShowVideoEditor(string file)
     {
         var full = Path.GetFullPath(file);

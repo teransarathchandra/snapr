@@ -15,6 +15,10 @@ namespace Snapr.App.Dialogs;
 public partial class SettingsWindow : Window
 {
     sealed record MicChoice(string? Id, string Name);
+    sealed record CameraChoice(string? Id, string Name);
+
+    string? _cameraId;
+    bool _camerasLoaded;
 
     readonly AppController _app;
 
@@ -40,6 +44,18 @@ public partial class SettingsWindow : Window
         SystemAudioCheck.IsChecked = s.RecordSystemAudio;
         MicCheck.IsChecked = s.RecordMicrophone;
         LoadMicrophones(s.MicDeviceId);
+        var w = s.Webcam;
+        WebcamCheck.IsChecked = w.Enabled;
+        _cameraId = w.DeviceId;
+        CameraCombo.ItemsSource = new[] { new CameraChoice(null, "Default camera") };
+        CameraCombo.SelectedIndex = 0;
+        ShapeCombo.ItemsSource = new[] { "Circle", "Rounded rectangle" };
+        ShapeCombo.SelectedIndex = (int)w.Shape;
+        SizeCombo.ItemsSource = new[] { "Small", "Medium", "Large" };
+        SizeCombo.SelectedIndex = (int)w.Size;
+        MirrorCheck.IsChecked = w.Mirror;
+        WebcamRows.IsEnabled = w.Enabled;
+        Loaded += async (_, _) => await LoadCamerasAsync();
         UpdateFfmpegStatus();
         FfmpegBox.TextChanged += (_, _) => UpdateFfmpegStatus();
         _presets.AddRange(s.Presets);
@@ -142,6 +158,25 @@ public partial class SettingsWindow : Window
         MicCombo.SelectedItem = choices.FirstOrDefault(c => c.Id == selectedId) ?? choices[0];
     }
 
+    async Task LoadCamerasAsync()
+    {
+        try
+        {
+            var list = await WebcamService.ListAsync();
+            var choices = new List<CameraChoice> { new(null, "Default camera") };
+            choices.AddRange(list.Select(c => new CameraChoice(c.Id, c.Name)));
+            CameraCombo.ItemsSource = choices;
+            CameraCombo.SelectedItem = choices.FirstOrDefault(c => c.Id is not null && c.Id == _cameraId) ?? choices[0];
+            _camerasLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Could not list cameras", ex);   // keep the saved camera id; the list stays at "Default camera"
+        }
+    }
+
+    void WebcamCheck_Changed(object sender, RoutedEventArgs e) => WebcamRows.IsEnabled = WebcamCheck.IsChecked == true;
+
     void Hotkey_KeyDown(object sender, KeyEventArgs e)
     {
         e.Handled = true;
@@ -198,6 +233,9 @@ public partial class SettingsWindow : Window
             RecordSystemAudio = SystemAudioCheck.IsChecked == true,
             RecordMicrophone = MicCheck.IsChecked == true,
             MicDeviceId = (MicCombo.SelectedItem as MicChoice)?.Id,
+            Webcam = new WebcamSettings(WebcamCheck.IsChecked == true,
+                _camerasLoaded ? (CameraCombo.SelectedItem as CameraChoice)?.Id : _cameraId,   // list not loaded yet: keep the saved camera
+                (WebcamShape)Math.Max(0, ShapeCombo.SelectedIndex), (WebcamSize)Math.Max(0, SizeCombo.SelectedIndex), MirrorCheck.IsChecked == true),
             Presets = _presets.ToArray(),
         });
         Close();

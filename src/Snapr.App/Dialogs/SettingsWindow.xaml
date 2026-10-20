@@ -61,6 +61,21 @@
     <CheckBox x:Name="MicCheck" Content="Record microphone"/>
     <ComboBox x:Name="MicCombo" DisplayMemberPath="Name" Margin="24,4,0,0"/>
 
+    <TextBlock Text="WEBCAM" Style="{StaticResource SectionHeader}"/>
+    <CheckBox x:Name="WebcamCheck" Content="Show webcam while recording" Checked="WebcamCheck_Changed" Unchecked="WebcamCheck_Changed"/>
+    <StackPanel x:Name="WebcamRows" Margin="24,4,0,0">
+      <ComboBox x:Name="CameraCombo" DisplayMemberPath="Name"/>
+      <StackPanel Orientation="Horizontal" Margin="0,4">
+        <TextBlock Text="Shape" Width="60" VerticalAlignment="Center"/>
+        <ComboBox x:Name="ShapeCombo" Width="160"/>
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Margin="0,4">
+        <TextBlock Text="Size" Width="60" VerticalAlignment="Center"/>
+        <ComboBox x:Name="SizeCombo" Width="160"/>
+      </StackPanel>
+      <CheckBox x:Name="MirrorCheck" Content="Mirror"/>
+    </StackPanel>
+
     <TextBlock Text="PRESETS" Style="{StaticResource SectionHeader}"/>
     <ListBox x:Name="PresetList" Height="120" DisplayMemberPath="Summary" SelectionChanged="PresetList_SelectionChanged"/>
     <StackPanel Orientation="Horizontal" Margin="0,6,0,0">

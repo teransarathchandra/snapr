@@ -1,5 +1,9 @@
 using System.Diagnostics;
+using System.ComponentModel;
+using System.Globalization;
 using System.IO;
+using System.Windows.Media.Imaging;
+using Snapr.App.Rendering;
 using Snapr.App.Platform;
 using Snapr.Core;
 using Snapr.Core.Video;
@@ -17,6 +21,39 @@ public static class VideoService
         var stderr = await p.StandardError.ReadToEndAsync();
         await p.WaitForExitAsync();   // exits 1 ("At least one output file must be specified"); that is expected
         return FfmpegProbe.Parse(stderr);
+    }
+
+    /// <summary>One frame at <paramref name="seconds"/> as a picture, or null when ffmpeg can't read it.</summary>
+    public static async Task<BitmapSource?> GrabFrameAsync(string ffmpeg, string file, double seconds)
+    {
+        var temp = Path.Combine(Path.GetTempPath(), $"snapr-frame-{Guid.NewGuid():N}.png");
+        try
+        {
+            var exit = await RunAsync(["-y", "-ss", seconds.ToString("0.###", CultureInfo.InvariantCulture), "-i", file,
+                "-frames:v", "1", "-f", "image2", "-c:v", "png", temp]);
+            // -ss at or past the end exits 0 without writing a file; take the last frame instead
+            if (exit == 0 && !File.Exists(temp))
+                exit = await RunAsync(["-hide_banner", "-y", "-sseof", "-0.5", "-i", file, "-update", "1", "-f", "image2", "-c:v", "png", temp]);
+            if (exit != 0 || !File.Exists(temp)) return null;
+            var image = ImageIo.DecodePng(File.ReadAllBytes(temp));
+            image.Freeze();
+            return image;
+        }
+        catch (Exception ex) when (ex is Win32Exception or IOException or UnauthorizedAccessException or InvalidOperationException
+            or NotSupportedException or FileFormatException)
+        {
+            Log.Write($"Couldn't grab a frame of {file}", ex);
+            return null;
+        }
+        finally { TryDelete(temp); }
+
+        async Task<int> RunAsync(string[] args)
+        {
+            using var p = Start(ffmpeg, args, stdout: false);
+            await p.StandardError.ReadToEndAsync();
+            await p.WaitForExitAsync();
+            return p.ExitCode;
+        }
     }
 
     /// <summary>Runs an export into <c>output + ".part"</c> and moves it to <paramref name="output"/> on success. On cancel or

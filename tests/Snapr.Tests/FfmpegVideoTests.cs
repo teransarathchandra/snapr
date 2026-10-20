@@ -103,4 +103,43 @@ public class FfmpegVideoTests
         Assert.Contains(input, args);
         Assert.Equal(@"C:\out dir\a b.part", args[^1]);
     }
+
+    static string Filter(IReadOnlyList<string> args) => args[args.ToList().IndexOf("-filter_complex") + 1];
+
+    [Fact]
+    public void Mp4_with_one_overlay_and_one_range()
+    {
+        var args = VideoExportArgs.Mp4("in.mp4", [new TimeRange(0, 3)], false, "out.mp4", [new VideoOverlayLayer("a.png", 1, 2)]);
+        Assert.Equal(["-y", "-i", "in.mp4", "-i", "a.png", "-filter_complex"], args.Take(6));
+        Assert.Equal("[0:v][1:v]overlay=0:0:enable='gte(t,1)*lt(t,2)'[o1];[o1]trim=start=0:end=3,setpts=PTS-STARTPTS[v0];[v0]concat=n=1:v=1:a=0[cv];[cv]scale=trunc(iw/2)*2:trunc(ih/2)*2[v]", Filter(args));
+    }
+
+    [Fact]
+    public void Mp4_with_two_overlays_two_ranges_and_audio()
+    {
+        var args = VideoExportArgs.Mp4("in.mp4", [new TimeRange(0, 1), new TimeRange(2, 3)], true, "out.mp4",
+            [new VideoOverlayLayer("a.png", 0.5, 2.5), new VideoOverlayLayer("b.png", 1, 1.25)]);
+        Assert.Equal(["-y", "-i", "in.mp4", "-i", "a.png", "-i", "b.png", "-filter_complex"], args.Take(8));
+        Assert.Equal("[0:v][1:v]overlay=0:0:enable='gte(t,0.5)*lt(t,2.5)'[o1];[o1][2:v]overlay=0:0:enable='gte(t,1)*lt(t,1.25)'[o2];[o2]split=2[r0][r1];"
+            + "[r0]trim=start=0:end=1,setpts=PTS-STARTPTS[v0];[0:a]atrim=start=0:end=1,asetpts=PTS-STARTPTS[a0];"
+            + "[r1]trim=start=2:end=3,setpts=PTS-STARTPTS[v1];[0:a]atrim=start=2:end=3,asetpts=PTS-STARTPTS[a1];"
+            + "[v0][a0][v1][a1]concat=n=2:v=1:a=1[cv][a];[cv]scale=trunc(iw/2)*2:trunc(ih/2)*2[v]", Filter(args));
+    }
+
+    [Fact]
+    public void Gif_with_overlay_and_two_ranges()
+    {
+        var args = VideoExportArgs.Gif("in.mp4", [new TimeRange(0, 1), new TimeRange(2, 3)], 640, 10, "out.gif", [new VideoOverlayLayer("a.png", 1, 2)]);
+        Assert.Equal(["-y", "-i", "in.mp4", "-i", "a.png", "-filter_complex"], args.Take(6));
+        Assert.Equal("[0:v][1:v]overlay=0:0:enable='gte(t,1)*lt(t,2)'[o1];[o1]split=2[r0][r1];"
+            + "[r0]trim=start=0:end=1,setpts=PTS-STARTPTS[v0];[r1]trim=start=2:end=3,setpts=PTS-STARTPTS[v1];"
+            + "[v0][v1]concat=n=2:v=1:a=0[c];[c]fps=10,scale=640:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=5[g]", Filter(args));
+    }
+
+    [Fact]
+    public void Empty_overlay_list_matches_no_overlays()
+    {
+        Assert.Equal(VideoExportArgs.Mp4("in.mp4", [new TimeRange(0, 3)], true, "o.mp4"), VideoExportArgs.Mp4("in.mp4", [new TimeRange(0, 3)], true, "o.mp4", []));
+        Assert.Equal(VideoExportArgs.Gif("in.mp4", [new TimeRange(0, 3)], null, 15, "o.gif"), VideoExportArgs.Gif("in.mp4", [new TimeRange(0, 3)], null, 15, "o.gif", []));
+    }
 }

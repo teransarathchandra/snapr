@@ -23,4 +23,5 @@ public sealed record AppSettings
     public Dictionary<ToolKind, ToolStyle> QuickStyles { get; init; } = new();
     public ToolKind LastTool { get; init; } = ToolKind.Arrow;
     public IReadOnlyList<CapturePreset> Presets { get; init; } = [];
+    public WebcamSettings Webcam { get; init; } = new();
 }

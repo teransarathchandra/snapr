@@ -1,84 +1,90 @@
-# Snapr
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Snapr: capture, annotate, redact and record your screen. Free, open source, one portable .exe for Windows." width="100%">
+</p>
 
-Snapr is a free, open-source screen capture and annotation tool for Windows.
-It is a single portable `.exe`: no installer and no admin rights.
+<p align="center">
+  <a href="https://github.com/teransarathchandra/snapr/releases/latest"><img src="https://img.shields.io/github/v/release/teransarathchandra/snapr?label=release&color=2563eb" alt="Latest release"></a>
+  <a href="https://github.com/teransarathchandra/snapr/actions/workflows/ci.yml"><img src="https://github.com/teransarathchandra/snapr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white" alt="Windows 10 and 11">
+  <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+</p>
 
-## Features
+<p align="center">
+  A free screen capture and annotation tool for Windows.<br>
+  No installer, no account, no admin rights. Download one <code>.exe</code> and press <kbd>Print Screen</kbd>.
+</p>
 
-- **Capture** a region, a window or every screen, with a magnifier, size readout and optional delay.
-- **Annotate** with arrows, text, callouts, shapes, pen, highlighter, numbered steps, blur or pixelate, magnifier, crop and eraser. Every object stays editable; undo goes back 100 steps.
-- **Work with several objects**: select with a box, Shift+click or Ctrl+A; move, nudge with the arrow keys, copy, delete, group (Ctrl+Shift+G), align and distribute them. Paste (Ctrl+V) or drop pictures onto a capture to add them as movable images.
-- **Combine images**: Ctrl+click two or more captures in the recents strip, then **Combine** to place them side by side, stacked or in a grid on a new capture; each one stays a movable picture.
-- **Templates**: pick one or more captures (recents Ctrl+click or the Library) and choose **Template…**: step by step with numbered badges, before / after, a grid with captions, or a single picture with a title and description. Every picture, text and badge stays editable.
-- **Cut out** a horizontal or vertical strip from the middle of a capture with a straight or torn join (Cut out tool, U); it is an image edit, so undo and Revert to original image bring it back.
-- **Select pixels** (Selection tool, R): drag a rectangle, then drag it to move those pixels, Delete to clear, Ctrl+C / Ctrl+X to copy or cut, or crop to it, or **Cover selection** to redact text Snapr can't read; the gap is filled with the most common colour along the selection's edge, or a colour you choose.
-- **Spotlight** areas (rectangle or ellipse): everything else is dimmed and can be blurred (Spotlight tool, L).
-- **Stamps**: 25 built-in recolourable stamps (check, cross, warning, arrows, badges …) plus your own PNG stamps (Stamp tool, G).
-- **Edit the image**: rotate, flip, resize, add margins (Image ▾) and fill areas with colour (Fill tool, F). Objects follow, every change can be undone while you edit, and the original capture pixels are always kept in the file.
-- **Redact** emails, web addresses, card numbers, phone numbers or words you choose: Snapr reads the text (Windows OCR) and covers what you tick with solid blocks or pixelation. **Revert to original image** (Image ▾) undoes all image edits, even after reopening. Covers are applied when you export, copy or print. The .snapr file keeps the original capture, so share an exported image.
-- **Simplify** (Image ▾ → Simplify…): turns text into rounded bars and buttons, panels and pictures into flat boxes, as one editable group — optionally over a plain background that hides the original.
-- **Effects**: border, drop shadow and torn edge.
-- **Grab Text** (OCR) from any part of the screen, using the OCR engine built into Windows.
-- **Scrolling capture** of long pages.
-- **Panoramic capture**: choose an area, then scroll, drag or pan the content yourself in any direction; Snapr follows and stitches it into one image (tray menu or Ctrl+Alt+Shift+Print Screen).
-- **Capture presets**: save a target (choose area, screen under the mouse, all screens or a fixed area), delay, action (edit, copy, grab text, save to a folder) and an optional hotkey; run them from Settings, the tray or the hotkey.
-- **Record video** of a region to MP4 with system audio and microphone.
-- **Trim videos and make GIFs**: after recording (or from the recents strip) trim the start and end, remove parts from the middle, and save a new MP4 or an animated GIF (uses your ffmpeg).
-- Every capture is saved automatically as a `.snapr` file and shown in the recents strip.
-- **Library** (toolbar, tray or Ctrl+L): every capture and video, grouped by month, with search (names, window titles, tags), kind and tag filters; tag captures, open them, show them in their folder or move them to the Recycle Bin.
-- **Open Snagit captures**: `.snagx` files open as editable Snapr captures (Open image…, drag onto the editor, or `Snapr.exe --open file.snagx`). The `.snagx` is never changed; anything Snapr has to approximate is listed in a banner.
-- **Export** to PNG, JPG, GIF, BMP or PDF, and **print** fitted to the page or at actual size.
+<p align="center">
+  <a href="https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe"><img src="https://img.shields.io/badge/Download-Snapr.exe-2563EB?style=for-the-badge&logo=windows&logoColor=white" alt="Download Snapr.exe"></a>
+  <a href="#build-from-source"><img src="https://img.shields.io/badge/Build-from_source-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Build from source"></a>
+</p>
 
-## Requirements
+## See it
 
-- Windows 10 version 1903 or later, or Windows 11 (x64).
-- For video recording: [ffmpeg](https://ffmpeg.org/download.html) on your `PATH`, or its location set in Settings. Snapr does not ship ffmpeg.
-- For Grab Text: at least one Windows language with optical character recognition (most display languages include it).
+### 1 · Capture and annotate
 
-## Use
+Press <kbd>Print Screen</kbd>, drag an area, then add arrows, text and numbered steps. Everything stays editable.
 
-| Action | Default hotkey |
+<img src="docs/assets/capture.gif" alt="A region is captured, then an arrow, a text label and two numbered steps are added" width="100%">
+
+### 2 · Redact in one click
+
+Snapr reads the text in the capture and finds emails, phone numbers, card numbers and web addresses for you.
+
+<img src="docs/assets/redact.gif" alt="Redact finds four emails and four phone numbers and covers them" width="100%">
+
+### 3 · Simplify
+
+Turn a busy screenshot into clean wireframe shapes, ready for docs and slides.
+
+<img src="docs/assets/simplify.gif" alt="Simplify turns every line of text into a rounded bar on a plain background" width="100%">
+
+## What's inside
+
+|  |  |
 |---|---|
-| Capture image | Print Screen |
-| Record video (press again to stop) | Shift + Print Screen |
-| Scrolling capture | Ctrl + Print Screen |
-| Repeat last capture | Ctrl + Alt + Print Screen |
-| Start, pause or resume a recording | Ctrl + Shift + Print Screen |
+| 📸 **Capture** | Region, window, all screens, scrolling pages and panoramas |
+| ✏️ **Annotate** | Arrows, text, callouts, shapes, steps, stamps, blur, spotlight, magnifier |
+| 🔒 **Redact** | Find and cover private text automatically, with Windows OCR |
+| 🔤 **Grab Text** | Copy the text from any part of the screen |
+| 🎬 **Record** | MP4 with system audio, microphone and a webcam bubble |
+| ✂️ **Trim and GIF** | Cut videos, annotate them and save MP4 or animated GIF |
+| 🗂️ **Library** | Every capture saved, searchable and taggable |
+| 📤 **Export** | PNG, JPG, GIF, BMP, PDF or print. Opens Snagit `.snagx` files too |
 
-While selecting: drag for a region, click a window, Space for all screens, C to copy without opening the editor, T to grab text, Esc to cancel.
+The full list is in [docs/features.md](docs/features.md).
 
-Editor shortcuts: Ctrl+Z / Alt+Backspace undo, Ctrl+Y redo, Ctrl+C copy (the selected object, or the whole image),
-Ctrl+X cut, Ctrl+V paste (a Snapr object, or a clipboard picture as a new capture), Delete delete, Ctrl+D or Esc
-deselect, Ctrl+S save, Ctrl+Shift+S save as image, Ctrl+O open, Ctrl+Shift+N new from clipboard, Ctrl+W close,
-Ctrl+P print, Ctrl+= / Ctrl+− zoom, Ctrl+0 fit. Tool keys: V select, A arrow, T text, K callout, S shape, P pen,
-H highlighter, N step, B blur, M magnify, C crop, E eraser.
+## Get started
 
-If Windows reports Print Screen as in use, turn off Settings → Accessibility → Keyboard → "Use the Print screen key to open screen capture", or choose another hotkey in Snapr's Settings.
+1. **[Download Snapr.exe](https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe)** and run it. It sits in the tray.
+2. Press <kbd>Print Screen</kbd> and drag an area.
 
-Files:
+> [!NOTE]
+> The exe is not code-signed yet. If Windows SmartScreen appears, click **More info → Run anyway**.
 
-- Captures: `Pictures\Snapr\yyyy-MM\*.snapr`
-- Videos: `Videos\Snapr\*.mp4`
-- If Windows Security's Controlled Folder Access blocks Snapr from Pictures or Videos, Snapr saves to `%LOCALAPPDATA%\Snapr\Captures` and `%LOCALAPPDATA%\Snapr\Videos` instead.
-- Settings: `%APPDATA%\Snapr\settings.json`
-- Logs: `%APPDATA%\Snapr\logs\`
+**Needs:** Windows 10 1903+ or Windows 11 (x64). Video recording also needs [ffmpeg](https://ffmpeg.org/download.html) on your `PATH` (or set its location in Settings).
 
-A `.snapr` file is a ZIP containing `document.json`, `base.png` (the original pixels) and `thumbnail.png`.
+| Hotkey | Action |
+|---|---|
+| <kbd>Print Screen</kbd> | Capture image |
+| <kbd>Shift</kbd> + <kbd>Print Screen</kbd> | Record video (press again to stop) |
+| <kbd>Ctrl</kbd> + <kbd>Print Screen</kbd> | Scrolling capture |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Print Screen</kbd> | Repeat last capture |
 
-## Build
+Every hotkey can be changed in Settings. Editor shortcuts and file locations: [docs/features.md](docs/features.md#shortcuts).
 
-Requires the .NET 10 SDK.
+## Build from source
+
+Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
 dotnet test
 dotnet run --project src/Snapr.App
-dotnet publish src/Snapr.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
 
 ## Contributing
 
-Snapr is written independently. Do not contribute code, images, icons, templates or text copied from any commercial product.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md).
 
-## Licence
-
-MIT. See [LICENSE](LICENSE). NAudio is MIT-licensed. ffmpeg is not distributed with Snapr.
+Released under the [MIT licence](LICENSE). ffmpeg is not bundled with Snapr.

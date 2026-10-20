@@ -11,6 +11,7 @@ using Microsoft.VisualBasic.FileIO;
 using Snapr.App.Dialogs;
 using Snapr.App.Rendering;
 using Snapr.Core;
+using Snapr.Core.Video;
 
 namespace Snapr.App.Library;
 
@@ -247,7 +248,7 @@ public partial class LibraryWindow : Window
         foreach (var item in sel)
         {
             var name = Path.GetFileName(item.Path);
-            if (_app.IsOpenInEditor(item.Path) && !_app.ReleaseFromEditor(item.Path))
+            if (_app.IsOpenInVideoEditor(item.Path) || (_app.IsOpenInEditor(item.Path) && !_app.ReleaseFromEditor(item.Path)))
             {
                 open.Add(name);
                 continue;
@@ -257,10 +258,18 @@ public partial class LibraryWindow : Window
             {
                 Log.Write($"Library: couldn't delete {item.Path}", ex);
                 failed.Add(name);
+                continue;
             }
+            var edits = VideoEditFile.PathFor(item.Path);
+            if (item.IsVideo && File.Exists(edits))
+                try { FileSystem.DeleteFile(edits, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+                {
+                    Log.Write($"Library: couldn't delete {edits}", ex);
+                }
         }
         if (open.Count > 0)
-            MessageBox.Show(this, $"Close it in the editor first.\n\n{string.Join("\n", open)}", "Delete", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, $"Close it in Snapr first.\n\n{string.Join("\n", open)}", "Delete", MessageBoxButton.OK, MessageBoxImage.Information);
         if (failed.Count > 0)
             MessageBox.Show(this, $"Snapr couldn't delete: {string.Join(", ", failed)}", "Delete", MessageBoxButton.OK, MessageBoxImage.Warning);
         _app.RefreshRecents();
