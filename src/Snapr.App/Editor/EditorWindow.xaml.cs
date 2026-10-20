@@ -37,6 +37,7 @@ public partial class EditorWindow : Window
     readonly AppController _app;
     readonly PickList _picks = new();
     CombineChoice _combineChoice = CombineChoice.Default;
+    TemplateChoice _templateChoice = TemplateChoice.Default;
     readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromSeconds(1) };
     readonly Dictionary<ToolKind, RadioButton> _toolButtons = new();
     CaptureDocument? _doc;
@@ -662,14 +663,21 @@ public partial class EditorWindow : Window
         RecentsList.Items.Clear();
         var items = RecentsIndex.List([CapturePaths.PicturesRoot, CapturePaths.VideosRoot]).ToList();
         _picks.Retain(_picks.Paths.Where(File.Exists));
-        if (_picks.Count >= 2)
+        if (_picks.Count >= 1)
         {
             var bar = new StackPanel { Margin = new Thickness(4, 10, 4, 10), VerticalAlignment = VerticalAlignment.Center };
-            var combine = new Button { Content = $"Combine ({_picks.Count})…", Style = (Style)FindResource("AccentButton") };
-            combine.Click += Combine_Click;
+            var template = new Button { Content = "Template…" };
+            if (_picks.Count == 1) template.Style = (Style)FindResource("AccentButton");
+            template.Click += (_, _) => MakeTemplate(this, _picks.Paths.ToArray());
+            bar.Children.Add(template);
+            if (_picks.Count >= 2)
+            {
+                var combine = new Button { Content = $"Combine ({_picks.Count})…", Margin = new Thickness(0, 4, 0, 0), Style = (Style)FindResource("AccentButton") };
+                combine.Click += Combine_Click;
+                bar.Children.Add(combine);
+            }
             var clear = new Button { Content = "Clear", Margin = new Thickness(0, 4, 0, 0) };
             clear.Click += (_, _) => { _picks.Clear(); RefreshRecents(); };
-            bar.Children.Add(combine);
             bar.Children.Add(clear);
             RecentsList.Items.Add(bar);
         }
@@ -747,27 +755,35 @@ public partial class EditorWindow : Window
         OpenRecent(item);
     }
 
-    void Combine_Click(object sender, RoutedEventArgs e)
+    enum PickPurpose { Combine, Template }
+
+    sealed record LoadedPicks(IReadOnlyList<BitmapSource> Pictures, IReadOnlyList<string?> Titles, IReadOnlyList<string> Skipped);
+
+    /// <summary>Saves the open capture, then flattens each pick (skipping unreadable ones) until the pixel cap. Shows its own
+    /// message and returns null when it can't go on. Shared by Combine and Templates (spec parity 14 §3).</summary>
+    LoadedPicks? LoadPicks(Window owner, IReadOnlyList<string> paths, PickPurpose purpose)
     {
-        var dialog = new CombineWindow(this, Swatches, _combineChoice);
-        if (dialog.ShowDialog() != true || dialog.Result is not { } choice) return;
-        _combineChoice = choice;
         Board.CommitTextEditor();
         if (_doc is not null && !FlushAutosave())
         {
-            MessageBox.Show(this, "Snapr couldn't save the open capture, so it can't be combined yet.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            MessageBox.Show(owner, purpose == PickPurpose.Combine
+                ? "Snapr couldn't save the open capture, so it can't be combined yet."
+                : "Snapr couldn't save the open capture, so it can't be used in a template yet.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
         }
         var pictures = new List<BitmapSource>();
+        var titles = new List<string?>();
         var skipped = new List<string>();
         var tooLarge = false;
         long area = 0;
-        foreach (var path in _picks.Paths)
+        foreach (var path in paths)
         {
             try
             {
-                var picture = CombineService.Flatten(SnaprFile.Load(path));
+                var doc = SnaprFile.Load(path);
+                var picture = CombineService.Flatten(doc);
                 pictures.Add(picture);
+                titles.Add(doc.Meta.SourceTitle);
                 area += (long)picture.PixelWidth * picture.PixelHeight;
             }
             catch (OutOfMemoryException ex)
@@ -784,9 +800,21 @@ public partial class EditorWindow : Window
         }
         if (tooLarge)
         {
-            MessageBox.Show(this, "The combined image would be too large.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
+            MessageBox.Show(owner, purpose == PickPurpose.Combine ? "The combined image would be too large." : "The template image would be too large.",
+                "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
         }
+        return new LoadedPicks(pictures, titles, skipped);
+    }
+
+    void Combine_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new CombineWindow(this, Swatches, _combineChoice);
+        if (dialog.ShowDialog() != true || dialog.Result is not { } choice) return;
+        _combineChoice = choice;
+        if (LoadPicks(this, _picks.Paths, PickPurpose.Combine) is not { } loaded) return;
+        var pictures = loaded.Pictures;
+        var skipped = loaded.Skipped;
         if (pictures.Count < 2)
         {
             MessageBox.Show(this, "Snapr needs at least two readable captures to combine.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -801,6 +829,31 @@ public partial class EditorWindow : Window
         _app.OpenNewCapture(output.Base, CaptureKind.Region, "Combined", annotations: output.Objects,
             notice: skipped.Count > 0 ? "Skipped (couldn't read): " + string.Join(", ", skipped) : null);
         SetTool(ToolKind.Move);
+        RefreshRecents();
+    }
+
+    /// <summary>Templates (spec parity 14 §3) from the recents pick or the Library; the result opens as a new capture.</summary>
+    public void MakeTemplate(Window owner, IReadOnlyList<string> paths)
+    {
+        var dialog = new TemplateWindow(owner, paths.Count, Swatches, _templateChoice);
+        if (dialog.ShowDialog() != true || dialog.Result is not { } choice) return;
+        _templateChoice = choice;
+        if (LoadPicks(owner, paths, PickPurpose.Template) is not { } picks) return;
+        if (TemplateRules.Fits(choice.Kind, picks.Pictures.Count) is not null)
+        {
+            MessageBox.Show(owner, "Snapr couldn't read enough captures for this template.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (TemplateService.Build(choice.Kind, picks.Pictures, picks.Titles, choice.Background) is not { } output)
+        {
+            MessageBox.Show(owner, "The template image would be too large.", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _picks.Clear();
+        _app.OpenNewCapture(output.Base, CaptureKind.Region, "Template", annotations: output.Objects,
+            notice: picks.Skipped.Count > 0 ? "Skipped (couldn't read): " + string.Join(", ", picks.Skipped) : null);
+        SetTool(ToolKind.Move);
+        Board.SelectIds([output.TitleId]);
         RefreshRecents();
     }
 

@@ -20,6 +20,8 @@ public sealed partial class AppController
         _library.Activate();
     }
 
+    public void ShowTemplate(System.Windows.Window owner, IReadOnlyList<string> paths) => Editor.MakeTemplate(owner, paths);
+
     public bool IsOpenInEditor(string fullPath) => _editor?.IsShowing(Path.GetFullPath(fullPath)) == true;
 
     public bool ReleaseFromEditor(string fullPath) => _editor?.ReleaseIfHidden(Path.GetFullPath(fullPath)) == true;

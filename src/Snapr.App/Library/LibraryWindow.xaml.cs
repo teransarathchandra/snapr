@@ -144,7 +144,7 @@ public partial class LibraryWindow : Window
     {
         var sel = Selected;
         OpenButton.IsEnabled = FolderButton.IsEnabled = DeleteButton.IsEnabled = sel.Count > 0;
-        TagsButton.IsEnabled = sel.Count > 0 && sel.All(i => !i.IsVideo && !i.Unreadable);
+        TagsButton.IsEnabled = TemplateButton.IsEnabled = sel.Count > 0 && sel.All(i => !i.IsVideo && !i.Unreadable);
     }
 
     void Menu_Opened(object sender, RoutedEventArgs e)
@@ -152,8 +152,9 @@ public partial class LibraryWindow : Window
         var items = ((ContextMenu)sender).Items.Cast<MenuItem>().ToArray();
         items[0].IsEnabled = OpenButton.IsEnabled;
         items[1].IsEnabled = TagsButton.IsEnabled;
-        items[2].IsEnabled = FolderButton.IsEnabled;
-        items[3].IsEnabled = DeleteButton.IsEnabled;
+        items[2].IsEnabled = TemplateButton.IsEnabled;
+        items[3].IsEnabled = FolderButton.IsEnabled;
+        items[4].IsEnabled = DeleteButton.IsEnabled;
     }
 
     void Search_TextChanged(object sender, TextChangedEventArgs e)
@@ -218,6 +219,14 @@ public partial class LibraryWindow : Window
         }
         if (failed.Count > 0)
             MessageBox.Show(this, $"Snapr couldn't save tags for: {string.Join(", ", failed)}", "Tags", MessageBoxButton.OK, MessageBoxImage.Warning);
+        Rescan();
+    }
+
+    void Template_Click(object sender, RoutedEventArgs e)
+    {
+        var sel = Selected;
+        if (sel.Count == 0 || !TemplateButton.IsEnabled) return;
+        _app.ShowTemplate(this, sel.Select(i => i.Path).ToArray());
         Rescan();
     }
 
