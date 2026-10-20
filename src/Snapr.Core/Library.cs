@@ -69,7 +69,7 @@ public static class LibrarySearch
         var words = q.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         return items.Where(i => KindMatches(i, q.Kind)
             && q.Tags.All(t => i.Tags.Contains(t, Same))
-            && words.All(w => Contains(System.IO.Path.GetFileName(i.Path), w) || Contains(i.Meta?.SourceTitle, w) || i.Tags.Any(t => Contains(t, w))))
+            && words.All(w => Contains(System.IO.Path.GetFileNameWithoutExtension(i.Path), w) || Contains(i.Meta?.SourceTitle, w) || i.Tags.Any(t => Contains(t, w))))
             .ToArray();
     }
 

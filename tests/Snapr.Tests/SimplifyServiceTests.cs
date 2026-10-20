@@ -22,6 +22,29 @@ public class SimplifyServiceTests
     static readonly TextLine Line = new([new TextWord("Hi", new Rct(150, 110, 30, 10))]);
 
     [Fact]
+    public void Notices()
+    {
+        var both = SimplifyOptions.Default;
+        const string NoOcr = "Windows has no text recognition language, so text was left as is.";
+        Assert.Null(SimplifyService.Notice(both, noOcr: false, found: true));
+        Assert.Equal("Snapr found nothing to simplify here.", SimplifyService.Notice(both, false, false));
+        Assert.Equal(NoOcr, SimplifyService.Notice(both, true, true));
+        Assert.Equal("Windows has no text recognition language, so text was left as is, and Snapr found no blocks to simplify.", SimplifyService.Notice(both, true, false));
+        Assert.Equal(NoOcr, SimplifyService.Notice(both with { Blocks = false }, true, false));
+        Assert.Equal("Snapr found nothing to simplify here.", SimplifyService.Notice(both with { Text = false }, true, false));
+        Assert.Null(SimplifyService.Notice(both with { Text = false }, true, true));
+    }
+
+    [Fact]
+    public void Shapes_go_under_existing_objects() => Sta.Run(() =>
+    {
+        var existing = SimplifyService.Build(Picture(), new Rct(0, 0, 200, 150), [Line], SimplifyOptions.Default);
+        var shapes = SimplifyService.Build(Picture(), new Rct(0, 0, 200, 150), [Line], SimplifyOptions.Default);
+        var all = SimplifyService.PlaceUnder(existing, shapes);
+        Assert.Equal(shapes.Concat(existing).Select(a => a.Id), all.Select(a => a.Id));
+    });
+
+    [Fact]
     public void Order_group_and_colours() => Sta.Run(() =>
     {
         var shapes = SimplifyService.Build(Picture(), new Rct(0, 0, 200, 150), [Line], SimplifyOptions.Default).Cast<ShapeAnnotation>().ToArray();

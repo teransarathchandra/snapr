@@ -225,7 +225,7 @@ public sealed class VideoEditorWindow : Window
 
     void OnKey(object sender, KeyEventArgs e)
     {
-        if (e.OriginalSource is ComboBox or TextBox) return;
+        if (e.OriginalSource is ComboBox or ComboBoxItem or TextBox) return;
         var ctrl = Keyboard.Modifiers == ModifierKeys.Control;
         if (e.Key == Key.Space && _play.IsEnabled && !Saving) TogglePlay();
         else if (e.Key == Key.Delete && _remove.IsEnabled) RemoveSelection();

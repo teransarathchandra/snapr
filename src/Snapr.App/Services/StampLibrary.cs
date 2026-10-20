@@ -10,9 +10,14 @@ public sealed class StampLibrary(string folder)
     public static string DefaultFolder { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Snapr", "Stamps");
 
+    [System.Runtime.InteropServices.DllImport("shlwapi.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int StrCmpLogicalW(string? a, string? b);
+
+    static readonly Comparer<string?> ExplorerOrder = Comparer<string?>.Create(StrCmpLogicalW);
+
     public IReadOnlyList<string> List() =>
         Directory.Exists(folder)
-            ? Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileNameWithoutExtension, StringComparer.OrdinalIgnoreCase).ToArray()
+            ? Directory.GetFiles(folder, "*.png").OrderBy(Path.GetFileNameWithoutExtension, ExplorerOrder).ToArray()
             : [];
 
     /// <summary>Copies a picture into the folder as PNG. Throws (and writes nothing) if it can't be read or is too large.</summary>

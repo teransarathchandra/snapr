@@ -27,6 +27,15 @@ public partial class App : Application
         TaskScheduler.UnobservedTaskException += (_, a) => { Log.Write("Unobserved task exception", a.Exception); a.SetObserved(); };
 
         base.OnStartup(e);
+        // Dark title bars on every window (spec parity 16 §2.1); older Windows ignores the attribute.
+        EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((s, args) =>
+        {
+            var on = 1;
+            var h = new System.Windows.Interop.WindowInteropHelper((Window)s).Handle;
+            if (h == IntPtr.Zero) return;
+            _ = Platform.Native.DwmSetWindowAttribute(h, 20, ref on, sizeof(int));
+            _ = Platform.Native.SetWindowPos(h, IntPtr.Zero, 0, 0, 0, 0, 0x0037);   // NOSIZE|NOMOVE|NOZORDER|NOACTIVATE|FRAMECHANGED: repaint the caption now
+        }));
         _controller = new AppController();
 
         var args = e.Args;

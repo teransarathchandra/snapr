@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 
 namespace Snapr.Core.Settings;
 
@@ -27,6 +28,7 @@ public static class PresetRules
         if (p.DelaySeconds is < 0 or > 10) return "Choose a delay from 0 to 10 seconds.";
         if (p.Target == PresetTarget.FixedArea && p.FixedArea is not { IsEmpty: false }) return "Choose the area to capture.";
         if (p.Action == PresetAction.SaveToFolder && string.IsNullOrWhiteSpace(p.SaveFolder)) return "Choose the folder to save to.";
+        if (p.Action == PresetAction.SaveToFolder && !Path.IsPathFullyQualified(p.SaveFolder!.Trim())) return @"Use a full folder path, such as C:\Users\you\Pictures.";
         if (p.Hotkey.Length > 0)
         {
             if (others.Any(o => string.Equals(o.Hotkey, p.Hotkey, StringComparison.OrdinalIgnoreCase))) return "Another preset already uses this hotkey.";

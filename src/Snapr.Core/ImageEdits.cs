@@ -43,6 +43,7 @@ public sealed record ClearAreaEdit(Rct Area, string? Fill) : ImageEdit;
 public static class ImageEditRules
 {
     public const int MaxEdits = 1_000;
+    public const string LimitMessage = "This capture has reached its limit of 1,000 image edits.";
     public const int MaxSide = 32_000;
     public const long MaxPixels = 100_000_000;
     public const int MaxMargin = 4_000;

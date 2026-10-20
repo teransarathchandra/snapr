@@ -99,9 +99,18 @@ public sealed class EditorCanvas : Canvas
 
     (int W, int H) ImageSize => (_base!.PixelWidth, _base.PixelHeight);
 
+    /// <summary>True, after showing the limit message, when the document can take no more image edits (spec parity 16 §3.5).</summary>
+    public bool EditsFull()
+    {
+        if (_state.Edits.Count < ImageEditRules.MaxEdits) return false;
+        Message?.Invoke(ImageEditRules.LimitMessage);
+        return true;
+    }
+
     public bool ClearSelectedPixels()
     {
         if (_base is null || _pixelSelection is not { } sel) return false;
+        if (EditsFull()) return true;
         CommitOwn(_state.ApplyEdit(ImageSize, new ClearAreaEdit(sel, GapFill)));
         return true;
     }
@@ -492,6 +501,7 @@ public sealed class EditorCanvas : Canvas
             case ToolKind.CutOut:
                 if (!IsClick(p) && Strip(_down, p) is { } strip && strip.End - strip.Start >= 2)
                 {
+                    if (EditsFull()) break;
                     var size = (_base!.PixelWidth, _base.PixelHeight);
                     var next = _state.ApplyEdit(size, new CutOutEdit(CutVertical, strip.Start, strip.End, CutJoin));
                     if (ReferenceEquals(next, _state)) Message?.Invoke("That would leave the image too small.");
@@ -503,6 +513,7 @@ public sealed class EditorCanvas : Canvas
                 {
                     var (dx, dy) = _pixelOffset;
                     _movingPixels = false;   // before Commit: the window's ShowState clears the selection, which is then re-set below
+                    if (EditsFull()) break;
                     var next = _state.ApplyEdit(ImageSize, new MovePixelsEdit(sel, dx, dy, GapFill));
                     if (ReferenceEquals(next, _state)) break;   // refused (e.g. the edit cap): nothing moved, the selection stays
                     CommitOwn(next);
@@ -546,6 +557,7 @@ public sealed class EditorCanvas : Canvas
         int x = (int)Math.Floor(p.X), y = (int)Math.Floor(p.Y);
         if (_base is null || x < 0 || y < 0 || x >= _base.PixelWidth || y >= _base.PixelHeight) return;
         if (!ColorText.TryArgb(CurrentStyle.Color, out var argb) || ImageIo.PixelAt(_base, x, y) == argb) return;
+        if (EditsFull()) return;
         Commit(_state.ApplyEdit((_base.PixelWidth, _base.PixelHeight), new FillEdit(x, y, CurrentStyle.Color, Options.FillTolerance)));
     }
 

@@ -160,4 +160,8 @@ public class ImageEditTests
         Assert.Equal(10, ToolOptions.Default.FillTolerance);
         Assert.Equal(ToolKind.Eraser + 1, ToolKind.Fill);   // appended, so saved LastTool/QuickStyles keep their meaning
     }
+
+    [Fact]
+    public void Limit_message_names_the_limit() =>
+        Assert.Equal("This capture has reached its limit of 1,000 image edits.", ImageEditRules.LimitMessage);
 }

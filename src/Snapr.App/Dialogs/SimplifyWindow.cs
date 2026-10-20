@@ -21,7 +21,7 @@ public sealed class SimplifyWindow : Window
 
     public SimplifyOptions? Result { get; private set; }
 
-    public SimplifyWindow(Window owner, IReadOnlyList<string> swatches, SimplifyOptions initial)
+    public SimplifyWindow(Window owner, IReadOnlyList<(string Color, string Name)> swatches, SimplifyOptions initial)
     {
         Owner = owner;
         Title = "Simplify";
@@ -50,7 +50,7 @@ public sealed class SimplifyWindow : Window
         _blocks.Unchecked += (_, _) => UpdateOk();
 
         AddSwatch("auto", "Auto", null);
-        foreach (var c in swatches) AddSwatch(c, c, ImageIo.Brush(c));
+        foreach (var (c, name) in swatches) AddSwatch(c, name, ImageIo.Brush(c));
         if (_swatches.All(s => !string.Equals(s.Color, _colour, StringComparison.OrdinalIgnoreCase))) _colour = "auto";
         StyleSwatches();
         UpdateOk();

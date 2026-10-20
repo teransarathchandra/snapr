@@ -12,6 +12,21 @@ public sealed record SimplifyOptions(bool Text, bool Blocks, bool PlainBackgroun
 /// <summary>Simplify (spec parity 15 §4): blocks become flat boxes, text lines rounded bars, all in one group.</summary>
 public static class SimplifyService
 {
+    const string NoOcrNotice = "Windows has no text recognition language, so text was left as is.";
+
+    /// <summary>The editor notice after a run, or null (spec parity 15 §4, parity 16 §3.7).</summary>
+    public static string? Notice(SimplifyOptions o, bool noOcr, bool found) => (noOcr && o.Text, found) switch
+    {
+        (true, true) => NoOcrNotice,
+        (true, false) when o.Blocks => "Windows has no text recognition language, so text was left as is, and Snapr found no blocks to simplify.",
+        (true, false) => NoOcrNotice,
+        (false, true) => null,
+        (false, false) => "Snapr found nothing to simplify here.",
+    };
+
+    /// <summary>New shapes go under the existing objects (spec parity 16 §4.10).</summary>
+    public static IReadOnlyList<Annotation> PlaceUnder(IReadOnlyList<Annotation> existing, IReadOnlyList<Annotation> shapes) => [.. shapes, .. existing];
+
     public static IReadOnlyList<Annotation> Build(BitmapSource visible, Rct area, IReadOnlyList<TextLine> lines, SimplifyOptions options)
     {
         var frame = ImageIo.ToFrame(visible);

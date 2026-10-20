@@ -248,6 +248,8 @@ public static class DocumentRenderer
         dc.DrawEllipse(ImageIo.Brush(x.Fill), null, P(x.Center), x.Size / 2, x.Size / 2);
         var label = StepLabels.Format(x.Number, x.Style);
         var ft = Text(label, "Segoe UI", x.Size * (label.Length > 2 ? 0.4 : 0.55), true, x.TextColor, double.NaN);
+        var scale = StepLabels.FitScale(x.Size, ft.Width);
+        if (scale < 1) ft = Text(label, "Segoe UI", x.Size * (label.Length > 2 ? 0.4 : 0.55) * scale, true, x.TextColor, double.NaN);
         dc.DrawText(ft, new Point(x.Center.X - ft.Width / 2, x.Center.Y - ft.Height / 2));
     }
 

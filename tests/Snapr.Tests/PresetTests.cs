@@ -129,4 +129,19 @@ public sealed class PresetTests : IDisposable
     [Fact]
     public void App_hotkeys_include_panoramic() =>
         Assert.Contains("Ctrl+Alt+Shift+PrintScreen", PresetRules.AppHotkeys(new HotkeySettings()));
+
+    [Theory]
+    [InlineData("captures")]
+    [InlineData(@"\captures")]
+    [InlineData(@"C:captures")]
+    public void Save_folder_must_be_a_full_path(string folder) =>
+        Assert.Equal(@"Use a full folder path, such as C:\Users\you\Pictures.",
+            PresetRules.Validate(Preset() with { Action = PresetAction.SaveToFolder, SaveFolder = folder }, [], NoAppHotkeys));
+
+    [Theory]
+    [InlineData(@"C:\Users\you\Pictures")]
+    [InlineData(@"\\server\share\caps")]
+    [InlineData(@"  C:\caps  ")]
+    public void Full_save_folders_are_accepted(string folder) =>
+        Assert.Null(PresetRules.Validate(Preset() with { Action = PresetAction.SaveToFolder, SaveFolder = folder }, [], NoAppHotkeys));
 }

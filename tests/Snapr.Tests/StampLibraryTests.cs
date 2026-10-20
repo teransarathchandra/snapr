@@ -20,6 +20,15 @@ public sealed class StampLibraryTests : IDisposable
     }
 
     [Fact]
+    public void Lists_in_explorer_order() => Sta.Run(() =>
+    {
+        var lib = new StampLibrary(Lib);
+        Directory.CreateDirectory(Lib);
+        foreach (var n in new[] { "Logo (10).png", "logo (2).png", "arrow.png" }) File.Copy(Picture("src-" + n), Path.Combine(Lib, n));
+        Assert.Equal(["arrow", "logo (2)", "Logo (10)"], lib.List().Select(Path.GetFileNameWithoutExtension));
+    });
+
+    [Fact]
     public void Missing_folder_lists_nothing() => Sta.Run(() =>
     {
         Assert.Empty(new StampLibrary(Lib).List());

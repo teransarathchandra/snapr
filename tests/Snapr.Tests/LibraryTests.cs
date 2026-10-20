@@ -182,4 +182,13 @@ public class LibraryTests : IDisposable
         Assert.Equal(["bug", "UI", "work"], LibrarySearch.AllTags([Item("a", tags: ["work", "UI"]), Item("b", tags: ["Work", "bug"]), Item("v.mp4", video: true)]));
 
     static IEnumerable<string> Names(IEnumerable<LibraryItem> items) => items.Select(i => Path.GetFileName(i.Path));
+
+    [Fact]
+    public void Search_ignores_the_file_extension()
+    {
+        LibraryItem[] items = [Item("report.snapr"), Item("demo.mp4", video: true), Item("snapr notes.snapr")];
+        Assert.Equal(["snapr notes.snapr"], Names(LibrarySearch.Filter(items, new("snapr", LibraryKind.All, []))));
+        Assert.Empty(LibrarySearch.Filter(items, new("mp4", LibraryKind.All, [])));
+        Assert.Equal(["report.snapr"], Names(LibrarySearch.Filter(items, new("repo", LibraryKind.All, []))));
+    }
 }

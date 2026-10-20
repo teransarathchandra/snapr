@@ -54,4 +54,12 @@ public class StepTests
         Assert.Equal([1, 2], s.SetStepNumber(first, -3).Annotations.OfType<StepAnnotation>().Select(x => x.Number));
         Assert.Equal(3, s.SetStepNumber(first, 7).NextStepNumber);
     }
+
+    [Theory]
+    [InlineData(36, 20, 1)]       // fits
+    [InlineData(36, 28.8, 1)]     // exactly 80 %
+    [InlineData(36, 57.6, 0.5)]   // twice too wide
+    [InlineData(36, 0, 1)]
+    public void FitScale_shrinks_only_wide_labels(double size, double width, double expected) =>
+        Assert.Equal(expected, StepLabels.FitScale(size, width), 6);
 }

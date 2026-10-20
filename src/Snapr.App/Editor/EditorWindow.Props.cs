@@ -16,7 +16,7 @@ namespace Snapr.App.Editor;
 /// <summary>Toolbar and the context-sensitive properties panel.</summary>
 public partial class EditorWindow
 {
-    static readonly string[] Swatches = ["#FFFF3B30", "#FFFF9500", "#FFFFCC00", "#FF34C759", "#FF3B82F6", "#FFAF52DE", "#FF111111", "#FFFFFFFF"];
+    static readonly string[] Swatches = EditorPalette.Colors;
 
     void BuildToolbar()
     {
@@ -346,15 +346,16 @@ public partial class EditorWindow
         foreach (var c in colours ?? Swatches)
         {
             var on = ColorText.WithAlpha(c, 0xFF) == ColorText.WithAlpha(current, 0xFF);
+            var name = nameOf?.Invoke(c) ?? EditorPalette.Name(c);
             var swatch = new Button
             {
                 Width = 26, Height = 26, Padding = new Thickness(0), Margin = new Thickness(0, 0, 6, 6),
                 Background = ImageIo.Brush(c),
                 BorderBrush = on ? (Brush)FindResource("AccentBrush") : (Brush)FindResource("PanelBorderBrush"),
                 BorderThickness = new Thickness(on ? 2 : 1),
-                ToolTip = nameOf?.Invoke(c) ?? c,
+                ToolTip = name,
             };
-            AutomationProperties.SetName(swatch, $"Colour {nameOf?.Invoke(c) ?? c}");
+            AutomationProperties.SetName(swatch, $"Colour {name}");
             swatch.Click += (_, _) => { pick(c); Board.Focus(); };
             row.Children.Add(swatch);
         }

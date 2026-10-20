@@ -61,7 +61,7 @@ public partial class EditorWindow : Window
         _autosave.Tick += (_, _) => { _autosave.Stop(); SaveNow(); };
         Board.Committed += OnCommitted;
         Board.Notice += ShowNotice;
-        Board.Message += text => _app.Notify("Cut out", text);
+        Board.Message += ShowNotice;
         Board.SelectionChanged += BuildProps;
         Board.PixelSelectionChanged += () =>
         {
@@ -118,6 +118,7 @@ public partial class EditorWindow : Window
     {
         if (_doc is null) return;
         Board.CommitTextEditor();
+        if (Board.EditsFull()) return;
         var image = CurrentImage();
         Board.Apply(s => s.ApplyEdit((image.PixelWidth, image.PixelHeight), edit));
     }
@@ -229,7 +230,7 @@ public partial class EditorWindow : Window
     }
 
     void Undo() { if (_undo is { CanUndo: true }) { HideMagnifierNotice(); Board.CommitTextEditor(); Board.ClearPixelSelection(); _undo.Undo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
-    void Redo() { if (_undo is { CanRedo: true }) { HideMagnifierNotice(); Board.ClearPixelSelection(); _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); } }
+    void Redo() { if (_undo is null) return; Board.CommitTextEditor(); if (!_undo.CanRedo) return; HideMagnifierNotice(); Board.ClearPixelSelection(); _undo.Redo(); _lastMergeKey = null; ShowState(); BuildProps(); }
 
     void UpdateUndoButtons()
     {
@@ -360,6 +361,7 @@ public partial class EditorWindow : Window
         Board.CommitTextEditor();
         var state = Board.State;
         var added = new List<Guid>();
+        var failed = new List<(string Name, string Reason)>();
         foreach (var (name, load) in sources)
         {
             try
@@ -371,9 +373,12 @@ public partial class EditorWindow : Window
             catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
             {
                 Log.Write($"Could not add image {name}", ex);
-                MessageBox.Show(this, $"Snapr couldn't add that image: {ex.Message}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+                failed.Add((name, ex.Message));
             }
         }
+        if (failed.Count == 1) MessageBox.Show(this, $"Snapr couldn't add that image: {failed[0].Reason}", "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
+        else if (failed.Count > 1)
+            MessageBox.Show(this, $"Snapr couldn't add {failed.Count} images:\n" + string.Join("\n", failed.Select(f => $"{f.Name}: {f.Reason}")), "Snapr", MessageBoxButton.OK, MessageBoxImage.Warning);
         if (added.Count == 0) return;
         Board.Apply(_ => state);
         SetTool(ToolKind.Move);
@@ -535,7 +540,7 @@ public partial class EditorWindow : Window
 
     void ResizeImage_Click(object sender, RoutedEventArgs e)
     {
-        if (_doc is null) return;
+        if (_doc is null || Board.EditsFull()) return;
         var image = CurrentImage();
         var dialog = new ResizeImageWindow(this, image.PixelWidth, image.PixelHeight);
         if (dialog.ShowDialog() == true && dialog.Result is { } size) ApplyImageEdit(new ResizeEdit(size.W, size.H));
@@ -543,7 +548,7 @@ public partial class EditorWindow : Window
 
     void CanvasSize_Click(object sender, RoutedEventArgs e)
     {
-        if (_doc is null) return;
+        if (_doc is null || Board.EditsFull()) return;
         var image = CurrentImage();
         var dialog = new CanvasSizeWindow(this, image.PixelWidth, image.PixelHeight, Board.CurrentStyle.Color);
         if (dialog.ShowDialog() == true && dialog.Result is { } margins) ApplyImageEdit(margins);
@@ -565,7 +570,12 @@ public partial class EditorWindow : Window
     void GrabText_Click(object sender, RoutedEventArgs e)
     {
         if (_base is null) return;
-        var crop = new CroppedBitmap(CurrentImage(), PixelRect(Board.Selected is { } s ? AnnotationGeometry.Bounds(s).Intersect(Board.View) : Board.View));
+        var picked = Board.SelectedObjects.Select(AnnotationGeometry.Bounds).Aggregate((Rct?)null, (u, b) => u is { } r ? r.Union(b) : b);
+        var area = picked is { } p ? p.Intersect(Board.View) : Board.View;
+        if (area.IsEmpty) area = Board.View;
+        var rect = PixelRect(area);
+        if (rect.Width <= 0 || rect.Height <= 0) rect = PixelRect(Board.View);   // never a zero-size crop
+        var crop = new CroppedBitmap(CurrentImage(), rect);
         crop.Freeze();
         _app.Fire(() => _app.GrabTextAsync(crop));
     }
@@ -611,7 +621,7 @@ public partial class EditorWindow : Window
         try
         {
             Board.CommitTextEditor();
-            var dialog = new SimplifyWindow(this, Swatches, _simplifyOptions);
+            var dialog = new SimplifyWindow(this, EditorPalette.Swatches, _simplifyOptions);
             if (dialog.ShowDialog() != true || dialog.Result is not { } options) return;
             _simplifyOptions = options;
             var doc = _doc;
@@ -637,15 +647,11 @@ public partial class EditorWindow : Window
                 if (Stale()) return;
                 var shapes = await Task.Run(() => SimplifyService.Build(visible, new Rct(area.X, area.Y, area.Width, area.Height), lines, options));
                 if (Stale()) return;
-                if (shapes.Count == 0)
-                {
-                    ShowNotice(noOcr && options.Text ? "Windows has no text recognition language, so text was left as is." : "Snapr found nothing to simplify here.");
-                    return;
-                }
-                Board.Apply(s => s with { Annotations = [.. s.Annotations, .. shapes] });
+                if (SimplifyService.Notice(options, noOcr, shapes.Count > 0) is { } notice) ShowNotice(notice);
+                if (shapes.Count == 0) return;
+                Board.Apply(s => s with { Annotations = [.. SimplifyService.PlaceUnder(s.Annotations, shapes)] });
                 SetTool(ToolKind.Move);
                 Board.SelectIds(shapes.Select(s => s.Id).ToArray());
-                if (noOcr && options.Text) ShowNotice("Windows has no text recognition language, so text was left as is.");
             }
             finally
             {
@@ -834,6 +840,7 @@ public partial class EditorWindow : Window
         var pictures = new List<BitmapSource>();
         var titles = new List<string?>();
         var skipped = new List<string>();
+        var what = purpose == PickPurpose.Combine ? "Combine" : "Template";
         var tooLarge = false;
         long area = 0;
         foreach (var path in paths)
@@ -848,12 +855,12 @@ public partial class EditorWindow : Window
             }
             catch (OutOfMemoryException ex)
             {
-                Log.Write($"Combine ran out of memory on {path}", ex);
+                Log.Write($"{what} ran out of memory on {path}", ex);
                 tooLarge = true;
             }
             catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or NotSupportedException or FileFormatException or ArgumentException or FormatException)
             {
-                Log.Write($"Combine skipped {path}", ex);
+                Log.Write($"{what} skipped {path}", ex);
                 skipped.Add(Path.GetFileName(path));
             }
             if (tooLarge || area > SnagxReader.MaxTotalPixels) { tooLarge = true; break; }
@@ -988,7 +995,7 @@ public partial class EditorWindow : Window
             case EditorCommand.Undo: Undo(); break;
             case EditorCommand.Redo: Redo(); break;
             case EditorCommand.Copy when PixelSelectionActive: CopyPixels(); break;
-            case EditorCommand.Cut when PixelSelectionActive: if (CopyPixels()) Board.ClearSelectedPixels(); break;
+            case EditorCommand.Cut when PixelSelectionActive: if (!Board.EditsFull() && CopyPixels()) Board.ClearSelectedPixels(); break;
             case EditorCommand.Delete when PixelSelectionActive: Board.ClearSelectedPixels(); break;
             case EditorCommand.Deselect when PixelSelectionActive: Board.ClearPixelSelection(); break;
             case EditorCommand.Copy: Copy(); break;

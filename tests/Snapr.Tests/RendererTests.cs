@@ -132,6 +132,16 @@ public class RendererTests
     });
 
     [Fact]
+    public void Wide_step_label_stays_inside_its_circle() => Sta.Run(() =>
+    {
+        var step = new StepAnnotation(new(50, 50), 621, 36, "#FF0000FF", "#FFFFFFFF") { Style = StepStyle.Letters };
+        var img = DocumentRenderer.Render(Solid(100, 100, 0), With(step), applyEffects: false);
+        for (var y = 0; y < 100; y++)
+            for (var x = 0; x < 100; x++)
+                if (x < 31 || x > 69 || y < 31 || y > 69) Assert.Equal(0u, Px(img, x, y));
+    });
+
+    [Fact]
     public void Arrow_has_a_filled_head_wider_than_the_shaft() => Sta.Run(() =>
     {
         var img = DocumentRenderer.Render(Solid(200, 100, 0xFFFFFFFF),

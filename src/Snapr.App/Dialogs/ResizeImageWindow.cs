@@ -90,10 +90,11 @@ public sealed class ResizeImageWindow : Window
                     _height.Text = Text(h);
                 }
             }
-            else if (_keep.IsChecked == true && source == _width && int.TryParse(_width.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var w) && w > 0)
+            else if (_keep.IsChecked == true && source == _width && int.TryParse(_width.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var w) && w > 0)
                 _height.Text = Text(ImageEditRules.ProportionalHeight(_w0, _h0, w));
-            else if (_keep.IsChecked == true && source == _height && int.TryParse(_height.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var h) && h > 0)
+            else if (_keep.IsChecked == true && source == _height && int.TryParse(_height.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var h) && h > 0)
                 _width.Text = Text(ImageEditRules.ProportionalWidth(_w0, _h0, h));
+            if (source != _percent) _percent.Text = ResizeText.Percent(_w0, _h0, _width.Text, _height.Text, CultureInfo.CurrentCulture);
         }
         finally { _syncing = false; }
         Validate();

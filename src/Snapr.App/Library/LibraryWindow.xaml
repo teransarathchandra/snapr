@@ -11,11 +11,14 @@
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="ToggleButton">
-            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12" Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="12">
+              <Border x:Name="Hover" CornerRadius="12" Padding="{TemplateBinding Padding}">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsChecked" Value="True"><Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentFillBrush}"/></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Hover" Property="Background" Value="{StaticResource HoverOverlayBrush}"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
