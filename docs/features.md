@@ -31,6 +31,7 @@
 ## Video
 
 - **Record** a region to MP4 with system audio and microphone. Needs [ffmpeg](https://ffmpeg.org/download.html).
+- **Click and key effects**: highlight the cursor, show clicks and keyboard shortcuts in recordings (never what you type). Turn them on in Settings.
 - **Webcam bubble**: turn on "Show webcam while recording" in Settings; drag it anywhere inside the area, or hide it from the recording bar.
 - **Trim and make GIFs**: trim the start and end, remove parts from the middle, and save a new MP4 or an animated GIF.
 - **Annotate videos**: pause, click **Annotate** and draw on the frame. Each annotation shows for 3 s; drag its bar on the Objects track to retime it. Edits are kept next to the video (`clip.mp4.snapr-edit.json`) and drawn into the saved MP4 or GIF.

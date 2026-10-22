@@ -25,4 +25,5 @@ public sealed record AppSettings
     public IReadOnlyList<CapturePreset> Presets { get; init; } = [];
     public WebcamSettings Webcam { get; init; } = new();
     public ShareSettings Share { get; init; } = new();
+    public RecordingEffects Effects { get; init; } = new();
 }

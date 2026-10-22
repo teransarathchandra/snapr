@@ -64,6 +64,7 @@ public static class SettingsStore
             QuickStyles = s.QuickStyles ?? new(),
             Webcam = s.Webcam ?? new(),
             Share = s.Share ?? new(),
+            Effects = s.Effects ?? new(),
             CaptureDelaySeconds = Math.Clamp(s.CaptureDelaySeconds, 0, 10),
             JpgQuality = Math.Clamp(s.JpgQuality, 1, 100),
             ExportFormat = s.ExportFormat is "jpg" ? "jpg" : "png",

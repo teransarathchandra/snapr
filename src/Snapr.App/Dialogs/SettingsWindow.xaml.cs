@@ -48,6 +48,9 @@ public partial class SettingsWindow : Window
         SystemAudioCheck.IsChecked = s.RecordSystemAudio;
         MicCheck.IsChecked = s.RecordMicrophone;
         LoadMicrophones(s.MicDeviceId);
+        HighlightCursorCheck.IsChecked = s.Effects.HighlightCursor;
+        ShowClicksCheck.IsChecked = s.Effects.ShowClicks;
+        ShowShortcutsCheck.IsChecked = s.Effects.ShowShortcuts;
         var w = s.Webcam;
         WebcamCheck.IsChecked = w.Enabled;
         _cameraId = w.DeviceId;
@@ -341,6 +344,7 @@ public partial class SettingsWindow : Window
             RecordSystemAudio = SystemAudioCheck.IsChecked == true,
             RecordMicrophone = MicCheck.IsChecked == true,
             MicDeviceId = (MicCombo.SelectedItem as MicChoice)?.Id,
+            Effects = new RecordingEffects(HighlightCursorCheck.IsChecked == true, ShowClicksCheck.IsChecked == true, ShowShortcutsCheck.IsChecked == true),
             Webcam = new WebcamSettings(WebcamCheck.IsChecked == true,
                 _camerasLoaded ? (CameraCombo.SelectedItem as CameraChoice)?.Id : _cameraId,   // list not loaded yet: keep the saved camera
                 (WebcamShape)Math.Max(0, ShapeCombo.SelectedIndex), (WebcamSize)Math.Max(0, SizeCombo.SelectedIndex), MirrorCheck.IsChecked == true),

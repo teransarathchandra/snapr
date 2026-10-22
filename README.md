@@ -55,6 +55,7 @@ Turn a busy screenshot into clean wireframe shapes, ready for docs and slides.
 | 🔒 **Redact** | Find and cover private text automatically, with Windows OCR |
 | 🔤 **Grab Text** | Copy the text from any part of the screen |
 | 🎬 **Record** | MP4 with system audio, microphone and a webcam bubble |
+| 🖱️ **Click and key effects** | Highlight the cursor, show clicks and keyboard shortcuts in recordings (never what you type) |
 | ✂️ **Trim and GIF** | Cut videos, annotate them and save MP4 or animated GIF |
 | 🗂️ **Library** | Every capture saved, searchable and taggable |
 | 📤 **Export** | PNG, JPG, GIF, BMP, PDF or print. Opens Snagit `.snagx` files too |

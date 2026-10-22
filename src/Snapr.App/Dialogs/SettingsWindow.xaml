@@ -60,6 +60,10 @@
     <CheckBox x:Name="SystemAudioCheck" Content="Record system audio"/>
     <CheckBox x:Name="MicCheck" Content="Record microphone"/>
     <ComboBox x:Name="MicCombo" DisplayMemberPath="Name" Margin="24,4,0,0"/>
+    <CheckBox x:Name="HighlightCursorCheck" Content="Highlight cursor"/>
+    <CheckBox x:Name="ShowClicksCheck" Content="Show clicks"/>
+    <CheckBox x:Name="ShowShortcutsCheck" Content="Show shortcuts"/>
+    <TextBlock Text="Only shortcuts like Ctrl+S are shown — never what you type." FontSize="11" Margin="24,0,0,4" Foreground="{StaticResource TextSecondaryBrush}"/>
 
     <TextBlock Text="WEBCAM" Style="{StaticResource SectionHeader}"/>
     <CheckBox x:Name="WebcamCheck" Content="Show webcam while recording" Checked="WebcamCheck_Changed" Unchecked="WebcamCheck_Changed"/>

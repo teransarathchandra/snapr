@@ -141,4 +141,18 @@ public sealed class SettingsTests : IDisposable
         File.WriteAllText(PathOf("null.json"), """{"share":null}""");
         Assert.Equal(new ShareSettings(), SettingsStore.Load(PathOf("null.json")).Share);
     }
+
+    [Fact]
+    public void Effects_settings_round_trip_and_defaults()
+    {
+        var s = new AppSettings { Effects = new RecordingEffects(true, false, true) };
+        SettingsStore.Save(s, PathOf("fx.json"));
+        Assert.Equal(s.Effects, SettingsStore.Load(PathOf("fx.json")).Effects);
+        File.WriteAllText(PathOf("old.json"), """{"exportFormat":"png"}""");
+        Assert.Equal(new RecordingEffects(), SettingsStore.Load(PathOf("old.json")).Effects);
+        File.WriteAllText(PathOf("nul.json"), """{"effects":null}""");
+        Assert.Equal(new RecordingEffects(), SettingsStore.Load(PathOf("nul.json")).Effects);
+        Assert.False(new RecordingEffects().Any);
+        Assert.True(new RecordingEffects(ShowClicks: true).Any);
+    }
 }

@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using Snapr.App.Capture;
 using Snapr.App.Dialogs;
+using Snapr.App.Platform;
 using Snapr.App.Services;
 using Snapr.Core;
 using Snapr.Core.Recording;
@@ -15,6 +16,8 @@ public sealed partial class AppController
     RecordingBar? _bar;
     WebcamService? _camera;
     WebcamBubble? _bubble;
+    InputHooks? _hooks;
+    EffectsOverlay? _effects;
 
     /// <summary>Starts a recording, or stops the current one (same hotkey).</summary>
     public async Task ToggleRecordingAsync()
@@ -56,6 +59,7 @@ public sealed partial class AppController
                 if (cameraOpen is not null) DisposeLateCamera(cameraOpen);
                 throw;
             }
+            if (_settings.Effects.Any) StartEffects(screen);   // before the bubble, so the bubble sits above the overlay
             if (cameraOpen is not null) await StartWebcamAsync(screen, cameraOpen, TimeSpan.FromSeconds(5) - opening.Elapsed);
             var recorder = new RecorderService(new RecorderService.Options(ffmpeg, screen, _settings.RecordSystemAudio,
                 _settings.RecordMicrophone, _settings.MicDeviceId, CapturePaths.NewVideoPath(CapturePaths.VideosRoot, DateTime.Now)));
@@ -68,7 +72,11 @@ public sealed partial class AppController
         }
         finally
         {
-            if (_recorder is null) StopWebcam();
+            if (_recorder is null)
+            {
+                StopWebcam();
+                StopEffects();
+            }
             _busy = false;
         }
     }
@@ -126,6 +134,32 @@ public sealed partial class AppController
         }
     }
 
+    void StartEffects(Rct screen)
+    {
+        var fx = _settings.Effects;
+        try
+        {
+            _effects = new EffectsOverlay(screen, fx);
+            _effects.Show();
+            _hooks = InputHooks.Start(fx.HighlightCursor || fx.ShowClicks, fx.ShowShortcuts);
+            _effects.Attach(_hooks);
+        }
+        catch (Exception ex)
+        {
+            Log.Write("Effects: start failed", ex);
+            StopEffects();
+            Notify("Snapr couldn't show recording effects", ex.Message);
+        }
+    }
+
+    void StopEffects()
+    {
+        _hooks?.Dispose();
+        _hooks = null;
+        _effects?.Close();
+        _effects = null;
+    }
+
     public void ToggleWebcam() => _bubble?.Toggle();
 
     void StopWebcam()
@@ -167,12 +201,17 @@ public sealed partial class AppController
         _bar?.Close();
         _bar = null;
         _tray.SetRecording(false, false);
+        var hooks = _hooks;
         var camera = _camera;   // this recording's camera; a new recording may start while this one is still muxing
         try
         {
             // The camera bubble stays until the screen grab has stopped. StopAsync awaits on the UI thread,
             // so the callback runs there too (StopWebcam touches a window); Dispatcher.Invoke covers any other thread.
-            var path = await recorder.StopAsync(() => Application.Current.Dispatcher.Invoke(StopWebcam));
+            var path = await recorder.StopAsync(() => Application.Current.Dispatcher.Invoke(() =>
+            {
+                StopWebcam();
+                StopEffects();
+            }));
             recorder.Dispose();
             _editor?.RefreshRecents();
             if (failure is not null)
@@ -194,6 +233,7 @@ public sealed partial class AppController
         finally
         {
             if (camera is not null && ReferenceEquals(_camera, camera)) StopWebcam();   // StopAsync threw before grabStopped
+            if (hooks is not null && ReferenceEquals(_hooks, hooks)) StopEffects();
         }
     }
 
@@ -202,6 +242,7 @@ public sealed partial class AppController
     {
         if (_recorder is not null) await StopRecordingAsync(failure: null);
         StopWebcam();
+        StopEffects();
         return _editor?.Shutdown() ?? true;
     }
 }
