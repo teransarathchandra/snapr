@@ -155,4 +155,47 @@ public sealed class SettingsTests : IDisposable
         Assert.False(new RecordingEffects().Any);
         Assert.True(new RecordingEffects(ShowClicks: true).Any);
     }
+
+    [Fact]
+    public void Alternate_image_hotkey_defaults_to_F12_when_missing()
+    {
+        File.WriteAllText(PathOf("a1.json"), """{"hotkeys":{"imageCapture":"F9"}}""");
+        Assert.Equal("F12", SettingsStore.Load(PathOf("a1.json")).Hotkeys.ImageCaptureAlt);
+        Assert.Equal("F12", new HotkeySettings().ImageCaptureAlt);
+        Assert.Equal("F12", SettingsStore.Load(PathOf("none.json")).Hotkeys.ImageCaptureAlt);
+    }
+
+    [Fact]
+    public void Defaulted_alternate_hotkey_that_collides_is_disabled()
+    {
+        File.WriteAllText(PathOf("a2.json"), """{"hotkeys":{"videoCapture":"f12"}}""");
+        var h = SettingsStore.Load(PathOf("a2.json")).Hotkeys;
+        Assert.Equal(("f12", ""), (h.VideoCapture, h.ImageCaptureAlt));
+    }
+
+    [Fact]
+    public void Defaulted_alternate_hotkey_that_collides_with_a_preset_is_disabled()
+    {
+        File.WriteAllText(PathOf("a3.json"), """{"presets":[{"name":"Quick","hotkey":"F12"}]}""");
+        var s = SettingsStore.Load(PathOf("a3.json"));
+        Assert.Equal("", s.Hotkeys.ImageCaptureAlt);
+        Assert.Equal("F12", Assert.Single(s.Presets).Hotkey);
+    }
+
+    [Fact]
+    public void Given_alternate_hotkey_is_kept_and_empty_means_disabled()
+    {
+        File.WriteAllText(PathOf("a4.json"), """{"hotkeys":{"imageCaptureAlt":"Ctrl+F12"}}""");
+        Assert.Equal("Ctrl+F12", SettingsStore.Load(PathOf("a4.json")).Hotkeys.ImageCaptureAlt);
+        File.WriteAllText(PathOf("a5.json"), """{"hotkeys":{"imageCaptureAlt":""}}""");
+        Assert.Equal("", SettingsStore.Load(PathOf("a5.json")).Hotkeys.ImageCaptureAlt);
+    }
+
+    [Fact]
+    public void Alternate_hotkey_round_trips()
+    {
+        var s = new AppSettings { Hotkeys = new HotkeySettings() with { ImageCaptureAlt = "Alt+F12" } };
+        SettingsStore.Save(s, PathOf("a6.json"));
+        Assert.Equal("Alt+F12", SettingsStore.Load(PathOf("a6.json")).Hotkeys.ImageCaptureAlt);
+    }
 }

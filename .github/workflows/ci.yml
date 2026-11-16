@@ -17,3 +17,10 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - run: dotnet test -c Release
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          dotnet publish src/Snapr.App -c Release -r win-x64 --self-contained `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true `
+            -p:Version=0.0.0 -o publish
+          dotnet build installer/Snapr.Installer.wixproj -c Release -p:Version=0.0.0

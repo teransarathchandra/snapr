@@ -19,7 +19,7 @@ public static class SettingsStore
             var given = (JsonNode.Parse(text) as JsonObject)?["hotkeys"] as JsonObject;
             return Normalize(JsonSerializer.Deserialize<AppSettings>(text, SnaprJson.Options) ?? new(),
                 repeatGiven: given?["repeatLastCapture"] is not null, pauseGiven: given?["videoPauseResume"] is not null,
-                panoramicGiven: given?["panoramicCapture"] is not null);
+                panoramicGiven: given?["panoramicCapture"] is not null, altGiven: given?["imageCaptureAlt"] is not null);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -37,7 +37,7 @@ public static class SettingsStore
     }
 
     /// <summary>A missing or null hotkey gets its default; an empty one stays empty (disabled).</summary>
-    static HotkeySettings Normalize(HotkeySettings? h, bool repeatGiven, bool pauseGiven, bool panoramicGiven, IEnumerable<string> presetKeys)
+    static HotkeySettings Normalize(HotkeySettings? h, bool repeatGiven, bool pauseGiven, bool panoramicGiven, bool altGiven, IEnumerable<string> presetKeys)
     {
         var d = new HotkeySettings();
         if (h is null) return d;
@@ -52,15 +52,17 @@ public static class SettingsStore
         var pause = Fill(h.VideoPauseResume, pauseGiven, d.VideoPauseResume);
         var panoramic = panoramicGiven ? h.PanoramicCapture ?? d.PanoramicCapture
             : new[] { image, video, scroll, repeat, pause }.Concat(presetKeys).Contains(d.PanoramicCapture, StringComparer.OrdinalIgnoreCase) ? "" : d.PanoramicCapture;
-        return new(image, video, scroll, repeat, pause, panoramic);
+        var imageAlt = altGiven ? h.ImageCaptureAlt ?? d.ImageCaptureAlt
+            : new[] { image, video, scroll, repeat, pause, panoramic }.Concat(presetKeys).Contains(d.ImageCaptureAlt, StringComparer.OrdinalIgnoreCase) ? "" : d.ImageCaptureAlt;
+        return new(image, video, scroll, repeat, pause, panoramic, imageAlt);
     }
 
-    static AppSettings Normalize(AppSettings s, bool repeatGiven, bool pauseGiven, bool panoramicGiven)
+    static AppSettings Normalize(AppSettings s, bool repeatGiven, bool pauseGiven, bool panoramicGiven, bool altGiven)
     {
         var presets = CleanPresets(s.Presets);
         return s with
         {
-            Hotkeys = Normalize(s.Hotkeys, repeatGiven, pauseGiven, panoramicGiven, presets.Select(p => p.Hotkey).Where(k => k != "")),
+            Hotkeys = Normalize(s.Hotkeys, repeatGiven, pauseGiven, panoramicGiven, altGiven, presets.Select(p => p.Hotkey).Where(k => k != "")),
             QuickStyles = s.QuickStyles ?? new(),
             Webcam = s.Webcam ?? new(),
             Share = s.Share ?? new(),

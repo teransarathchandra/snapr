@@ -1,6 +1,6 @@
 # Features
 
-[Capture](#capture) · [Edit](#edit) · [Video](#video) · [Library and files](#library-and-files) · [Shortcuts](#shortcuts) · [Troubleshooting](#troubleshooting)
+[Capture](#capture) · [Edit](#edit) · [Video](#video) · [Library and files](#library-and-files) · [Install and startup](#install-and-startup) · [Shortcuts](#shortcuts) · [Troubleshooting](#troubleshooting)
 
 ## Capture
 
@@ -50,11 +50,17 @@
 
 A `.snapr` file is a ZIP with `document.json`, `base.png` (the original pixels) and `thumbnail.png`. Open one from the command line with `Snapr.exe --open file.snapr` (works for `.snagx` too).
 
+## Install and startup
+
+- **Start with Windows**: turn on in Settings → General. It is on after the MSI install and off for the portable `Snapr.exe`. Installing a newer MSI keeps your choice.
+- **Installer**: `Snapr.msi` installs per user with no admin rights, adds a Start Menu entry and uninstalls from Windows Settings. Uninstalling keeps your settings and captures. The portable `Snapr.exe` is still available.
+
 ## Shortcuts
 
 | Hotkey | Action |
 |---|---|
 | <kbd>Print Screen</kbd> | Capture image |
+| <kbd>F12</kbd> | Capture image (alternate). Takes F12 from browser DevTools and code editors while Snapr runs; clear it in Settings to give it back. |
 | <kbd>Shift</kbd>+<kbd>Print Screen</kbd> | Record video (press again to stop) |
 | <kbd>Ctrl</kbd>+<kbd>Print Screen</kbd> | Scrolling capture |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Print Screen</kbd> | Repeat last capture |

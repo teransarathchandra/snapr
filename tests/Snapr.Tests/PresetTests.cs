@@ -61,7 +61,15 @@ public sealed class PresetTests : IDisposable
 
     [Fact]
     public void App_hotkeys_skip_disabled_ones() =>
-        Assert.Equal(["PrintScreen"], PresetRules.AppHotkeys(new HotkeySettings("PrintScreen", "", "", "", "", "")));
+        Assert.Equal(["PrintScreen"], PresetRules.AppHotkeys(new HotkeySettings("PrintScreen", "", "", "", "", "", "")));
+
+    [Fact]
+    public void App_hotkeys_include_the_alternate_image_hotkey_when_set()
+    {
+        Assert.Contains("F12", PresetRules.AppHotkeys(new HotkeySettings()));
+        Assert.DoesNotContain("", PresetRules.AppHotkeys(new HotkeySettings() with { ImageCaptureAlt = "" }));
+        Assert.Equal(6, PresetRules.AppHotkeys(new HotkeySettings() with { ImageCaptureAlt = "" }).Count());
+    }
 
     [Fact]
     public void At_most_20_presets()

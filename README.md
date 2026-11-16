@@ -12,11 +12,12 @@
 
 <p align="center">
   A free screen capture and annotation tool for Windows.<br>
-  No installer, no account, no admin rights. Download one <code>.exe</code> and press <kbd>Print Screen</kbd>.
+  Portable <code>.exe</code> or per-user installer. No account, no admin rights either way. Press <kbd>Print Screen</kbd> or <kbd>F12</kbd>.
 </p>
 
 <p align="center">
   <a href="https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.exe"><img src="https://img.shields.io/badge/Download-Snapr.exe-2563EB?style=for-the-badge&logo=windows&logoColor=white" alt="Download Snapr.exe"></a>
+  <a href="https://github.com/teransarathchandra/snapr/releases/latest/download/Snapr.msi"><img src="https://img.shields.io/badge/Download-Snapr.msi-2563EB?style=for-the-badge&logo=windows&logoColor=white" alt="Download Snapr.msi"></a>
   <a href="#build-from-source"><img src="https://img.shields.io/badge/Build-from_source-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt="Build from source"></a>
 </p>
 
@@ -24,9 +25,14 @@
 
 ### 1 · Install in 10 seconds
 
-Download one file and run it. No installer, no admin rights. Snapr waits in the tray.
+Download `Snapr.exe` and run it, or install `Snapr.msi`. No admin rights either way. Snapr waits in the tray.
 
 <img src="docs/assets/install.gif" alt="PowerShell downloads Snapr.exe with curl, runs it, then Print Screen captures part of the screen and the editor opens" width="100%">
+
+**Prefer an installer?** Double-click `Snapr.msi`, choose **Next**, accept the licence and choose **Install**. It is per user, so no admin rights are needed. It adds a Start Menu entry and starts Snapr with Windows; turn that off in Settings → General. Uninstall from Windows Settings and your settings and captures are kept.
+
+> [!NOTE]
+> Both files are unsigned, so Windows SmartScreen may say "Windows protected your PC". Choose **More info → Run anyway**.
 
 ### 2 · Capture and annotate
 
@@ -72,7 +78,7 @@ The full list is in [docs/features.md](docs/features.md).
    .\Snapr.exe
    ```
    > [!NOTE]
-   > Snapr.exe isn't code-signed yet, so on first run Windows SmartScreen may say "Windows protected your PC". Choose **More info → Run anyway**. You can check the download against `Snapr.exe.sha256` on the release page.
+   > Snapr.exe isn't code-signed yet, so on first run Windows SmartScreen may say "Windows protected your PC". Choose **More info → Run anyway**. You can check the download against `Snapr.exe.sha256` (or `Snapr.msi.sha256` for the installer) on the release page.
 2. Snapr starts in the tray. Press <kbd>Print Screen</kbd> and drag an area.
 
 **Needs:** Windows 10 1903+ or Windows 11 (x64). Video recording also needs [ffmpeg](https://ffmpeg.org/download.html) on your `PATH` (or set its location in Settings).
@@ -80,6 +86,7 @@ The full list is in [docs/features.md](docs/features.md).
 | Hotkey | Action |
 |---|---|
 | <kbd>Print Screen</kbd> | Capture image |
+| <kbd>F12</kbd> | Capture image (alternate). Takes F12 from browser DevTools and code editors while Snapr runs; clear it in Settings to give it back. |
 | <kbd>Shift</kbd> + <kbd>Print Screen</kbd> | Record video (press again to stop) |
 | <kbd>Ctrl</kbd> + <kbd>Print Screen</kbd> | Scrolling capture |
 | <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Print Screen</kbd> | Repeat last capture |
@@ -94,6 +101,15 @@ Needs the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0).
 dotnet test
 dotnet run --project src/Snapr.App
 ```
+
+Build the installer:
+
+```powershell
+dotnet publish src/Snapr.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
+dotnet build installer/Snapr.Installer.wixproj -c Release
+```
+
+The installer is written to `installer/bin/Release/Snapr.msi`.
 
 ## Contributing
 

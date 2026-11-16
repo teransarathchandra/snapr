@@ -21,7 +21,16 @@ public sealed partial class AppController : IDisposable
         _settings = SettingsStore.Load(SettingsStore.DefaultPath);
         _tray = new TrayService(this);
         RegisterHotkeys();
+        RefreshStartupEntry();
         _tray.SetPresets(_settings.Presets);
+    }
+
+    /// <summary>While Start with Windows is on, keep the Run value pointing at this exe (moved or other copy). Never blocks startup.</summary>
+    static void RefreshStartupEntry()
+    {
+        if (Environment.ProcessPath is not { } exe) return;
+        try { StartupService.Apply(StartupEntry.Decide(null, StartupService.Read(), exe), exe); }
+        catch (Exception ex) when (StartupService.IsRegistryError(ex)) { Log.Write("Start with Windows refresh failed", ex); }
     }
 
     public AppSettings Settings => _settings;
@@ -79,6 +88,7 @@ public sealed partial class AppController : IDisposable
             if (!_hotkeys.TryRegister(gesture, () => Fire(action))) failed.Add(gesture);
         }
         Register(_settings.Hotkeys.ImageCapture, () => CaptureImageAsync());
+        Register(_settings.Hotkeys.ImageCaptureAlt, () => CaptureImageAsync());
         Register(_settings.Hotkeys.VideoCapture, ToggleRecordingAsync);
         Register(_settings.Hotkeys.ScrollingCapture, ScrollingCaptureAsync);
         Register(_settings.Hotkeys.PanoramicCapture, PanoramicCaptureAsync);

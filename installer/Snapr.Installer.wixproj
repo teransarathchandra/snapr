@@ -1,0 +1,18 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputName>Snapr</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Version Condition="'$(Version)' == ''">0.0.0</Version>
+    <ExePath Condition="'$(ExePath)' == ''">$(MSBuildThisFileDirectory)..\publish\Snapr.exe</ExePath>
+    <!-- ICE91: fixed perUser package, no ALLUSERS variance. -->
+    <!-- ICE61: AllowSameVersionUpgrades makes VersionMax inclusive on purpose, so same-version MSIs upgrade. -->
+    <SuppressIces>ICE61;ICE91</SuppressIces>
+    <DefineConstants>$(DefineConstants);Version=$(Version);ExePath=$(ExePath)</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+  <Target Name="CheckExe" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(ExePath)')" Text="Snapr.exe not found at $(ExePath). Run the dotnet publish command first." />
+  </Target>
+</Project>

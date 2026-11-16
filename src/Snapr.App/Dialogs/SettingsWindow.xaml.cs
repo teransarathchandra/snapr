@@ -33,7 +33,9 @@ public partial class SettingsWindow : Window
         MaxHeight = SystemParameters.WorkArea.Height;
         Icon = AppIcon.Render(64);
         var s = app.Settings;
+        StartupCheck.IsChecked = ReadStartup();
         ImageHotkey.Text = s.Hotkeys.ImageCapture;
+        ImageAltHotkey.Text = s.Hotkeys.ImageCaptureAlt;
         VideoHotkey.Text = s.Hotkeys.VideoCapture;
         ScrollHotkey.Text = s.Hotkeys.ScrollingCapture;
         RepeatHotkey.Text = s.Hotkeys.RepeatLastCapture;
@@ -198,7 +200,7 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>The app hotkeys as currently typed in this window (not yet saved), for clash checks.</summary>
-    HotkeySettings TypedHotkeys() => new(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text);
+    HotkeySettings TypedHotkeys() => new(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text, ImageAltHotkey.Text);
 
     void AddPreset_Click(object sender, RoutedEventArgs e) => OpenEditor(null);
 
@@ -310,9 +312,17 @@ public partial class SettingsWindow : Window
         if (dialog.ShowDialog(this) == true) FfmpegBox.Text = dialog.FileName;
     }
 
+    bool _startupReadFailed;   // unreadable Run key: Save must not touch it
+
+    bool ReadStartup()
+    {
+        try { return StartupService.Read() is not null; }
+        catch (Exception ex) when (StartupService.IsRegistryError(ex)) { _startupReadFailed = true; Log.Write("Start with Windows read failed", ex); return false; }
+    }
+
     void Save_Click(object sender, RoutedEventArgs e)
     {
-        var appKeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text }
+        var appKeys = new[] { ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text, ImageAltHotkey.Text }
             .Where(h => h.Length > 0).ToArray();   // empty = disabled
         var hotkeys = appKeys.Concat(_presets.Select(p => p.Hotkey).Where(h => h.Length > 0)).ToArray();
         if (hotkeys.Any(h => !HotkeyGesture.TryParse(h, out _, out _)))
@@ -333,9 +343,18 @@ public partial class SettingsWindow : Window
             return;
         }
         var ffmpeg = FfmpegBox.Text.Trim();
+        if (!_startupReadFailed && Environment.ProcessPath is { } exe)
+        {
+            try { StartupService.Apply(StartupEntry.Decide(StartupCheck.IsChecked == true, StartupService.Read(), exe), exe); }
+            catch (Exception ex) when (StartupService.IsRegistryError(ex))
+            {
+                Log.Write("Start with Windows change failed", ex);
+                _app.Notify("Start with Windows", ex.Message);
+            }
+        }
         _app.UpdateSettings(_app.Settings with
         {
-            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text),
+            Hotkeys = new HotkeySettings(ImageHotkey.Text, VideoHotkey.Text, ScrollHotkey.Text, RepeatHotkey.Text, PauseHotkey.Text, PanoHotkey.Text, ImageAltHotkey.Text),
             CaptureDelaySeconds = (int)DelaySlider.Value,
             IncludeCursor = CursorCheck.IsChecked == true,
             ExportFormat = JpgRadio.IsChecked == true ? "jpg" : "png",

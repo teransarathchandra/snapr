@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Click and key effects in recordings: cursor highlight, click ripples and a shortcut badge (all off by default).
+- Replace text: click an OCR line in the editor and type over it in a matching size, colour and weight; font picker for text.
+- F12 opens image capture as a second hotkey next to Print Screen (change or clear it in Settings).
+- Start Snapr with Windows (Settings → General).
+- Snapr.msi: a per-user installer with no admin rights, Start Menu entry and uninstall from Windows Settings; the portable Snapr.exe stays.
+
 ## [0.2.0] - 2026-10-20
 
 ### Fixed
