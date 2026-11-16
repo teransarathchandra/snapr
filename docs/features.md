@@ -22,6 +22,7 @@
 - **Stamps** (<kbd>G</kbd>): 25 built-in recolourable stamps plus your own PNGs.
 - **Edit the image**: rotate, flip, resize, add margins (Image ▾) and fill areas with colour (<kbd>F</kbd>). The original pixels are always kept, and **Revert to original image** brings them back.
 - **Redact** emails, web addresses, card numbers, phone numbers or words you choose, with solid blocks or pixelation. Covers are applied when you export, copy or print; the `.snapr` file keeps the original, so share an exported image.
+- **Replace text**: click a line of text in a screenshot and type over it in a matching size, colour and weight.
 - **Simplify** (Image ▾): turn text into rounded bars and UI blocks into flat boxes, as one editable group, optionally over a plain background.
 - **Effects**: border, drop shadow and torn edge.
 - **Open Snagit captures**: `.snagx` files open as editable Snapr captures. The `.snagx` is never changed; anything Snapr approximates is listed in a banner.

@@ -199,7 +199,7 @@ public partial class EditorWindow : Window
         EmptyText.Visibility = hasDoc ? Visibility.Collapsed : Visibility.Visible;
         CanvasFrame.Visibility = ZoomButton.Visibility = hasDoc ? Visibility.Visible : Visibility.Collapsed;
         ImageButton.IsEnabled = hasDoc;
-        RedactButton.IsEnabled = hasDoc;
+        RedactButton.IsEnabled = ReplaceTextButton.IsEnabled = hasDoc;
     }
 
     // ---------- Edits, undo, autosave ----------
@@ -682,6 +682,62 @@ public partial class EditorWindow : Window
         }
     }
 
+    bool _replacingText;
+
+    void ReplaceText_Click(object sender, RoutedEventArgs e)
+    {
+        if (Board.Replacing) Board.EndReplace();
+        else _app.Fire(ReplaceTextAsync);
+    }
+
+    /// <summary>Replace text (spec parity 22 §2): OCR the visible area like Simplify, then let the canvas pick a line to type over.</summary>
+    async Task ReplaceTextAsync()
+    {
+        if (_doc is null || _replacingText) return;
+        _replacingText = true;
+        try
+        {
+            Board.CommitTextEditor();
+            var doc = _doc;
+            var edits = _undo!.Current.Edits;
+            var view = Board.View;
+            bool Stale() => !ReferenceEquals(doc, _doc) || _undo is null || !ReferenceEquals(edits, _undo.Current.Edits) || Board.View != view;   // capture changed or image edited meanwhile
+            var area = PixelRect(view);
+            var image = CurrentImage();
+            var visible = new CroppedBitmap(image, area);
+            visible.Freeze();
+            IReadOnlyList<TextLine> lines = [];
+            var cursor = Mouse.OverrideCursor;
+            Mouse.OverrideCursor = Cursors.Wait;
+            try
+            {
+                try { lines = await OcrService.RecognizeLinesAsync(visible); }
+                catch (OcrUnavailableException) { _app.ShowOcrHelp(); return; }
+                catch (Exception ex) when (ex is not OutOfMemoryException)
+                {
+                    Log.Write("Replace text: reading text failed", ex);
+                    MessageBox.Show(this, $"Snapr couldn't read the text: {ex.Message}", "Replace text", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                if (Stale()) { ShowNotice(SimplifyService.ViewChangedNotice); return; }
+                if (lines.Count == 0) { ShowNotice("Snapr couldn't find any text here."); return; }
+                var frame = ImageIo.ToFrame(image);
+                var placed = lines.Select(l => ReplaceText.Offset(l, area.X, area.Y)).ToArray();
+                SetTool(ToolKind.Move);
+                Board.Select(null);
+                Board.BeginReplace(placed, line => ReplaceTextService.Build(frame, line));
+            }
+            finally
+            {
+                Mouse.OverrideCursor = cursor;
+            }
+        }
+        finally
+        {
+            _replacingText = false;
+        }
+    }
+
     /// <summary>Warns when a magnifier still shows part of the new covers; the warning hides again on undo/redo.</summary>
     void WarnIfMagnified(DocumentState next, IReadOnlyList<Guid> added)
     {
@@ -1020,6 +1076,7 @@ public partial class EditorWindow : Window
             case EditorCommand.Cut: Cut(); break;
             case EditorCommand.Paste: Paste(); break;
             case EditorCommand.Delete: Board.DeleteSelected(); break;
+            case EditorCommand.Deselect when Board.Replacing: Board.EndReplace(); break;
             case EditorCommand.Deselect: Board.CommitTextEditor(); Board.Select(null); break;
             case EditorCommand.SaveNow:
                 Board.CommitTextEditor();

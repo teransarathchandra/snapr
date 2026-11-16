@@ -53,6 +53,7 @@ Turn a busy screenshot into clean wireframe shapes, ready for docs and slides.
 | 📸 **Capture** | Region, window, all screens, scrolling pages and panoramas |
 | ✏️ **Annotate** | Arrows, text, callouts, shapes, steps, stamps, blur, spotlight, magnifier |
 | 🔒 **Redact** | Find and cover private text automatically, with Windows OCR |
+| ✍️ **Replace text** | Click a line of text in a screenshot and type over it in a matching size, colour and weight |
 | 🔤 **Grab Text** | Copy the text from any part of the screen |
 | 🎬 **Record** | MP4 with system audio, microphone and a webcam bubble |
 | 🖱️ **Click and key effects** | Highlight the cursor, show clicks and keyboard shortcuts in recordings (never what you type) |

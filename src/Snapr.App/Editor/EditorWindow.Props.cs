@@ -249,6 +249,7 @@ public partial class EditorWindow
             Hint("Drag over the image to crop. Pixels outside are kept, so you can reset.");
             ButtonRow(("Reset crop", () => Board.Apply(s => s.ResetCrop())));
         }
+        FontRow();
         if (selected is { GroupId: not null }) ButtonRow(("Ungroup", Ungroup));
         if (selected is not null)
             ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(selected.Id))),
@@ -302,6 +303,7 @@ public partial class EditorWindow
             ButtonRow(("Horizontally", () => Board.Apply(s => s.Distribute(Board.SelectedIds, Axis.Horizontal))),
                       ("Vertically", () => Board.Apply(s => s.Distribute(Board.SelectedIds, Axis.Vertical))));
         }
+        FontRow();
         var grouping = new List<(string Text, Action Click)>();
         if (!IsOneGroup(many)) grouping.Add(("Group", Group));
         if (many.Any(a => a.GroupId is not null)) grouping.Add(("Ungroup", Ungroup));
@@ -309,6 +311,23 @@ public partial class EditorWindow
         ButtonRow(("Bring to front", () => Board.Apply(s => s.BringToFront(Board.SelectedIds))),
                   ("Send to back", () => Board.Apply(s => s.SendToBack(Board.SelectedIds))),
                   ("Delete", Board.DeleteSelected));
+    }
+
+    /// <summary>Font picker (spec parity 22 §4) when the selection holds exactly one text object.</summary>
+    void FontRow()
+    {
+        if (Board.SelectedObjects.OfType<TextAnnotation>().ToArray() is not [var t]) return;
+        Label("Font");
+        var box = new ComboBox { ItemsSource = TextFonts.For(t.FontFamily), SelectedItem = t.FontFamily };
+        AutomationProperties.SetName(box, "Font");
+        box.SelectionChanged += (_, _) =>
+        {
+            if (box.SelectedItem is not string f) return;
+            if (Board.State.Annotations.OfType<TextAnnotation>().FirstOrDefault(x => x.Id == t.Id) is { } now && now.FontFamily != f)
+                Board.Apply(s => s.Replace(now with { FontFamily = f }));
+            Board.Focus();
+        };
+        PropsPanel.Children.Add(box);
     }
 
     void Align(AlignEdge edge) => Board.Apply(s => s.Align(Board.SelectedIds, edge));

@@ -55,8 +55,44 @@ public sealed class EditorCanvas : Canvas
         set
         {
             if (value != ToolKind.Selection) SetPixelSelection(null);
+            EndReplace();
             _tool = value;
         }
+    }
+
+    // Replace mode (spec parity 22 §2): OCR line outlines; a click on a line starts a cover + text edit.
+    IReadOnlyList<TextLine>? _replaceLines;
+    Func<TextLine, (ShapeAnnotation Cover, TextAnnotation Text)>? _replaceBuild;
+    int _replaceHover = -1;
+    ShapeAnnotation? _replaceCover;   // non-null: the open text edit is a replace edit
+    static readonly Brush ReplaceHoverFill = ImageIo.Brush("#303B82F6");
+
+    public bool Replacing => _replaceLines is not null;
+
+    /// <summary>Starts replace mode on these lines (image coordinates); <paramref name="build"/> makes the cover and text for a clicked line.</summary>
+    public void BeginReplace(IReadOnlyList<TextLine> lines, Func<TextLine, (ShapeAnnotation Cover, TextAnnotation Text)> build)
+    {
+        _replaceLines = lines;
+        _replaceBuild = build;
+        _replaceHover = -1;
+        InvalidateVisual();
+    }
+
+    public void EndReplace()
+    {
+        if (_replaceLines is null) return;
+        _replaceLines = null;
+        _replaceBuild = null;
+        _replaceHover = -1;
+        InvalidateVisual();
+    }
+
+    int ReplaceLineAt(Pt p)
+    {
+        if (_replaceLines is null) return -1;
+        for (var i = 0; i < _replaceLines.Count; i++)
+            if (ReplaceText.LineBox(_replaceLines[i]).Contains(p)) return i;
+        return -1;
     }
 
     Rct? _pixelSelection;
@@ -150,6 +186,7 @@ public sealed class EditorCanvas : Canvas
     public void Load(BitmapSource baseImage, DocumentState state)
     {
         CancelTextEditor();
+        EndReplace();
         _base = baseImage;
         SetPixelSelection(null);
         _selected = [];
@@ -168,6 +205,7 @@ public sealed class EditorCanvas : Canvas
 
     public void SetState(DocumentState state)
     {
+        if (Replacing && (state.Crop != _state.Crop || !ReferenceEquals(state.Edits, _state.Edits) && !state.Edits.SequenceEqual(_state.Edits))) EndReplace();   // outlines would no longer match the pixels
         _state = state;
         _preview = null;
         var kept = state.ExpandToGroups(_selected);
@@ -240,6 +278,7 @@ public sealed class EditorCanvas : Canvas
         dc.PushTransform(new TranslateTransform(-v.X, -v.Y));
         var state = _preview ?? _state;
         DocumentRenderer.DrawScene(dc, _base, state);
+        DrawReplaceLines(dc);
         if (_cropDrag is { } c) DrawCropPreview(dc, c);
         if (_cutDrag is { } cut) DrawCutPreview(dc, cut);
         if (_box is { } box) dc.DrawRectangle(BoxFill, new Pen(Accent, 1 / Zoom) { DashStyle = DashStyles.Dash }, ToRect(box));
@@ -247,6 +286,14 @@ public sealed class EditorCanvas : Canvas
         DrawSelection(dc, state);
         dc.Pop();
         dc.Pop();
+    }
+
+    void DrawReplaceLines(DrawingContext dc)
+    {
+        if (_replaceLines is null) return;
+        var pen = new Pen(Accent, 1 / Zoom);
+        for (var i = 0; i < _replaceLines.Count; i++)
+            dc.DrawRectangle(i == _replaceHover ? ReplaceHoverFill : null, pen, ToRect(ReplaceText.LineBox(_replaceLines[i])));
     }
 
     void DrawCropPreview(DrawingContext dc, Rct c)
@@ -357,6 +404,15 @@ public sealed class EditorCanvas : Canvas
         var p = ToImage(e);
         _down = p;
         e.Handled = true;
+        if (Replacing)
+        {
+            if (ReplaceLineAt(p) is >= 0 and var i)
+            {
+                var (cover, text) = _replaceBuild!(_replaceLines![i]);
+                BeginTextEdit(text, isNew: true, cover);
+            }
+            return;
+        }
         switch (Tool)
         {
             case ToolKind.Move:
@@ -409,6 +465,13 @@ public sealed class EditorCanvas : Canvas
     {
         if (_base is null) return;
         var p = ToImage(e);
+        if (Replacing)
+        {
+            var i = ReplaceLineAt(p);
+            if (i != _replaceHover) { _replaceHover = i; InvalidateVisual(); }
+            Cursor = i >= 0 ? Cursors.Hand : Cursors.Arrow;
+            return;
+        }
         Cursor = Tool == ToolKind.Move && OnHandle(p) ? Cursors.SizeNWSE
             : Tool == ToolKind.Selection && (_movingPixels || !IsMouseCaptured && _pixelSelection is { } over && over.Contains(p)) ? Cursors.SizeAll
             : ToolCursor;
@@ -584,7 +647,15 @@ public sealed class EditorCanvas : Canvas
         InvalidateVisual();
     }
 
-    void BeginTextEdit(Annotation a, bool isNew)
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        if (_replaceHover < 0) return;
+        _replaceHover = -1;
+        InvalidateVisual();
+    }
+
+    void BeginTextEdit(Annotation a, bool isNew, ShapeAnnotation? replaceCover = null)
     {
         var (pos, width, size, color, bold, text) = a switch
         {
@@ -594,10 +665,11 @@ public sealed class EditorCanvas : Canvas
         };
         _textTarget = a;
         _textIsNew = isNew;
+        _replaceCover = replaceCover;
         var box = new TextBox
         {
             Text = text,
-            FontFamily = new FontFamily("Segoe UI"),
+            FontFamily = new FontFamily(a is TextAnnotation own ? DocumentRenderer.SafeFontFamily(own.FontFamily) : "Segoe UI"),
             FontSize = size,
             FontWeight = bold ? FontWeights.Bold : FontWeights.Normal,
             Foreground = ImageIo.Brush(color),
@@ -616,7 +688,13 @@ public sealed class EditorCanvas : Canvas
         SetTop(box, pos.Y - View.Y - 1);
         box.PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape || (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift))
+            if (e.Key == Key.Escape && _replaceCover is not null)
+            {
+                e.Handled = true;
+                CancelTextEditor();
+                Focus();
+            }
+            else if (e.Key == Key.Escape || (e.Key == Key.Enter && Keyboard.Modifiers != ModifierKeys.Shift))
             {
                 e.Handled = true;
                 CommitTextEditor();
@@ -633,7 +711,7 @@ public sealed class EditorCanvas : Canvas
             CalloutAnnotation c => c with { Text = "" },
             _ => a,
         };
-        _preview = isNew ? _state.Add(blank) : _state.Replace(blank);
+        _preview = replaceCover is not null ? _state.Add(replaceCover).Add(blank) : isNew ? _state.Add(blank) : _state.Replace(blank);
         InvalidateVisual();
         Dispatcher.BeginInvoke(() => { box.Focus(); box.SelectAll(); }, DispatcherPriority.Input);
     }
@@ -645,7 +723,10 @@ public sealed class EditorCanvas : Canvas
         _textTarget = null;
         Children.Remove(box);
         _preview = null;
-        Commit((_textIsNew ? _state.Add(target) : _state).CommitText(target.Id, box.Text));
+        var cover = _replaceCover;
+        _replaceCover = null;
+        if (cover is not null && target is TextAnnotation replaced) Commit(_state.AddReplace(cover, replaced, box.Text));
+        else Commit((_textIsNew ? _state.Add(target) : _state).CommitText(target.Id, box.Text));
         InvalidateVisual();
     }
 
@@ -656,5 +737,7 @@ public sealed class EditorCanvas : Canvas
         _textTarget = null;
         Children.Remove(box);
         _preview = null;
+        _replaceCover = null;
+        InvalidateVisual();
     }
 }
